@@ -1,6 +1,12 @@
 import {initializeApp} from 'firebase/app';
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+} from 'firebase/auth';
+import {getFirestore, collection, doc, getDoc, setDoc} from 'firebase/firestore';
 import Config from 'react-native-config';
-import {getFirestore} from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: Config.FIREBASE_API_KEY,
@@ -13,6 +19,48 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
 const db = getFirestore(app);
 
-export {db};
+export const loginUser = async (email, password) => {
+  try {
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+    return {
+      user: userCredential.user,
+      userData: userDoc.data(),
+    };
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const registerUser = async (email, password, userData) => {
+  try {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    await setDoc(doc(db, 'users', userCredential.user.uid), {
+      ...userData,
+      role: 'user',
+      createdAt: new Date().toISOString(),
+    });
+    return {
+      user: userCredential.user,
+      userData: {
+        ...userData,
+        role: 'user',
+      },
+    };
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const logoutUser = async () => {
+  try {
+    await signOut(auth);
+  } catch (error) {
+    throw error;
+  }
+};
+
+export {auth, db};

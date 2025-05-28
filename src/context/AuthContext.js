@@ -1,23 +1,9 @@
 import React, {createContext, useState, useContext, useEffect} from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-// Mock user data
-const mockUsers = [
-  {
-    id: '1',
-    email: 'user@example.com',
-    password: 'password123',
-    name: 'John Doe',
-    avatar: 'https://randomuser.me/api/portraits/men/32.jpg',
-  },
-  {
-    id: '2',
-    email: 'jane@example.com',
-    password: 'password123',
-    name: 'Jane Smith',
-    avatar: 'https://randomuser.me/api/portraits/women/44.jpg',
-  },
-];
+import {auth, loginUser, registerUser, logoutUser} from '../config/firebase';
+import {onAuthStateChanged} from 'firebase/auth';
+import {doc, getDoc} from 'firebase/firestore';
+import {db} from '../config/firebase';
 
 const AuthContext = createContext(null);
 
@@ -26,100 +12,93 @@ export const AuthProvider = ({children}) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Check for stored auth on app load
   useEffect(() => {
-    const loadStoredAuth = async () => {
-      try {
-        const storedUser = await AsyncStorage.getItem('user');
-        if (storedUser) {
-          setUser(JSON.parse(storedUser));
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          const userData = userDoc.data();
+          setUser({
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            ...userData,
+          });
+        } catch (error) {
+          console.error('Error fetching user data:', error);
         }
-      } catch (e) {
-        console.error('Failed to load auth info from storage:', e);
-      } finally {
-        setLoading(false);
+      } else {
+        setUser(null);
       }
-    };
+      setLoading(false);
+    });
 
-    loadStoredAuth();
+    return () => unsubscribe();
   }, []);
 
   const login = async (email, password) => {
-    setError(null);
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      const foundUser = mockUsers.find(
-        u =>
-          u.email.toLowerCase() === email.toLowerCase() &&
-          u.password === password,
-      );
-
-      if (foundUser) {
-        // Remove password before storing
-        const {password, ...userWithoutPassword} = foundUser;
-        setUser(userWithoutPassword);
-        await AsyncStorage.setItem('user', JSON.stringify(userWithoutPassword));
-        return true;
-      } else {
-        setError('Invalid email or password');
-        return false;
-      }
-    } catch (e) {
-      setError('Login failed. Please try again.');
-      console.error('Login error:', e);
+      setError(null);
+      const {user: firebaseUser, userData} = await loginUser(email, password);
+      setUser({
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        ...userData,
+      });
+      return true;
+    } catch (error) {
+      setError(error.message);
       return false;
     }
   };
 
   const register = async (name, email, password) => {
-    setError(null);
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Check if user already exists
-      const userExists = mockUsers.some(
-        u => u.email.toLowerCase() === email.toLowerCase(),
-      );
-
-      if (userExists) {
-        setError('Email already in use');
-        return false;
-      }
-
-      const newUser = {
-        id: `${mockUsers.length + 1}`,
-        email,
+      setError(null);
+      const userData = {
         name,
-        avatar: `https://randomuser.me/api/portraits/${
-          Math.random() > 0.5 ? 'men' : 'women'
-        }/${Math.floor(Math.random() * 60) + 1}.jpg`,
+        email,
       };
-
-      setUser(newUser);
-      await AsyncStorage.setItem('user', JSON.stringify(newUser));
+      const {user: firebaseUser, userData: createdUserData} = await registerUser(
+        email,
+        password,
+        userData,
+      );
+      setUser({
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        ...createdUserData,
+      });
       return true;
-    } catch (e) {
-      setError('Registration failed. Please try again.');
-      console.error('Registration error:', e);
+    } catch (error) {
+      setError(error.message);
       return false;
     }
   };
 
   const logout = async () => {
     try {
-      await AsyncStorage.removeItem('user');
+      await logoutUser();
       setUser(null);
-    } catch (e) {
-      console.error('Logout error:', e);
+    } catch (error) {
+      console.error('Logout error:', error);
     }
+  };
+
+  const isAdmin = () => {
+    return user?.role === 'admin';
   };
 
   return (
     <AuthContext.Provider
-      value={{user, loading, error, login, register, logout}}>
+      value={{
+        user,
+        loading,
+        error,
+        login,
+        register,
+        logout,
+        isAdmin,
+      }}>
       {children}
     </AuthContext.Provider>
   );

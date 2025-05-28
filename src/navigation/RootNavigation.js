@@ -6,10 +6,14 @@ import NotFoundScreen from '../components/not-found';
 import ProductScreen from '../screens/product/[id]';
 import ProfileScreen from '../screens/profile/profile';
 import SearchScreen from '../screens/search/search';
+import AdminPanel from '../screens/admin/AdminPanel';
+import {useAuth} from '../context/AuthContext';
 
 const Stack = createStackNavigator();
 
 const RootNavigation = () => {
+  const {user, isAdmin} = useAuth();
+
   return (
     <Stack.Navigator screenOptions={{headerShown: false}}>
       <Stack.Screen name="BottomTab" component={BottomTabNavigation} />
@@ -19,6 +23,14 @@ const RootNavigation = () => {
       <Stack.Screen name="NotFound" component={NotFoundScreen} />
       <Stack.Screen name="profile" component={ProfileScreen} />
       <Stack.Screen name="search" component={SearchScreen} />
+      
+      {/* Admin Routes */}
+      {isAdmin() && (
+        <>
+          <Stack.Screen name="AdminPanel" component={AdminPanel} />
+          {/* Add other admin screens here */}
+        </>
+      )}
     </Stack.Navigator>
   );
 };
