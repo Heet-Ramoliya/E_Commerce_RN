@@ -27,7 +27,7 @@ const RootNavigation = () => {
       {/* Admin Routes */}
       {isAdmin() && (
         <>
-          <Stack.Screen name="AdminPanel" component={AdminPanel} />
+          <Stack.Screen name="AdminPanel\" component={AdminPanel} />
           {/* Add other admin screens here */}
         </>
       )}
