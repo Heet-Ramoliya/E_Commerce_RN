@@ -67,7 +67,6 @@ const Button = ({
   const getTextStyles = () => {
     let textStyles = [styles.buttonText];
 
-    // Add variant text styles
     switch (variant) {
       case 'primary':
         textStyles.push(styles.primaryButtonText);
@@ -85,7 +84,6 @@ const Button = ({
         textStyles.push(styles.primaryButtonText);
     }
 
-    // Add size text styles
     switch (size) {
       case 'small':
         textStyles.push(styles.smallButtonText);
@@ -94,16 +92,25 @@ const Button = ({
         textStyles.push(styles.largeButtonText);
         break;
       default:
-        // Medium is default, no additional styles needed
         break;
     }
 
-    // Add disabled text style
     if (disabled || loading) {
       textStyles.push(styles.disabledButtonText);
     }
 
     return textStyles;
+  };
+
+  const getLoaderSize = () => {
+    switch (size) {
+      case 'small':
+        return 'small';
+      case 'large':
+        return 'large';
+      default:
+        return 'small';
+    }
   };
 
   const getLoaderColor = () => {
@@ -126,19 +133,19 @@ const Button = ({
       style={[...getButtonStyles(), style]}
       onPress={onPress}
       disabled={disabled || loading}
-      activeOpacity={0.7}>
+      activeOpacity={loading ? 1 : 0.7}
+      accessibilityLabel={loading ? 'Loading' : title}>
       {leftIcon && !loading && leftIcon}
-
       {loading ? (
         <ActivityIndicator
-          size="small"
+          size={getLoaderSize()}
           color={getLoaderColor()}
           style={styles.loader}
+          accessibilityLabel="Loading"
         />
       ) : (
         <Text style={[...getTextStyles(), textStyle]}>{title}</Text>
       )}
-
       {rightIcon && !loading && rightIcon}
     </TouchableOpacity>
   );
@@ -211,7 +218,7 @@ const styles = StyleSheet.create({
     // No specific changes needed, opacity is handled at the button level
   },
   loader: {
-    marginRight: 0,
+    marginHorizontal: Spacing.sm,
   },
 });
 

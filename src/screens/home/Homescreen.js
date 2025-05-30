@@ -64,7 +64,7 @@ const Homescreen = () => {
       <View style={styles.heroContainer}>
         <View style={styles.heroContent}>
           <Text style={styles.welcomeText}>
-            Hello, {user ? user.name.split(' ')[0] : 'Guest'}
+            Hello, {user ? user.firstName : 'Guest'}
           </Text>
           <Text style={styles.heroTitle}>Find your perfect product</Text>
           <Text style={styles.heroSubtitle}>

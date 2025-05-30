@@ -1,69 +1,41 @@
-import React, {useState} from 'react';
+import React, {useEffect} from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Image,
-  TouchableOpacity,
   ScrollView,
   ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
 import {
   User as UserIcon,
   Package,
-  Settings,
   CreditCard,
-  Mail,
-  Phone,
   Bell,
   LogOut,
   Lock,
   ChevronRight,
 } from 'lucide-react-native';
 import {useNavigation} from '@react-navigation/native';
-import {getUserOrders} from '../../data/orders';
-import InputField from '../../components/InputField';
-import Button from '../../components/Button';
 import Colors from '../../constants/Colors';
 import Spacing from '../../constants/Spacing';
 import Typography from '../../constants/Typography';
 import {useAuth} from '../../context/AuthContext';
-import OrderCard from '../../components/OrderCard';
 
 export default function ProfileScreen() {
   const navigation = useNavigation();
-  const {
-    user,
-    login,
-    register,
-    logout,
-    loading: authLoading,
-    error: authError,
-  } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  const [isLogin, setIsLogin] = useState(true);
-  const [formSubmitting, setFormSubmitting] = useState(false);
-
-  const handleAuth = async () => {
-    setFormSubmitting(true);
-
-    if (isLogin) {
-      await login(email, password);
-    } else {
-      await register(name, email, password);
-    }
-
-    setFormSubmitting(false);
-  };
+  const {user, logout, loading: authLoading} = useAuth();
 
   const handleLogout = async () => {
     await logout();
   };
 
-  // Get order history for logged in user
-  const userOrders = user ? getUserOrders(user.id) : [];
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigation.navigate('login');
+    }
+  }, [authLoading, user, navigation]);
 
   if (authLoading) {
     return (
@@ -73,120 +45,31 @@ export default function ProfileScreen() {
     );
   }
 
-  // Auth Form (when not logged in)
   if (!user) {
-    return (
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.contentContainer}>
-        <View style={styles.header}>
-          <Text style={styles.title}>
-            {isLogin ? 'Sign In' : 'Create Account'}
-          </Text>
-          <Text style={styles.subtitle}>
-            {isLogin
-              ? 'Sign in to access your orders and account details'
-              : 'Create an account to start shopping with us'}
-          </Text>
-        </View>
-
-        {!isLogin && (
-          <InputField
-            label="Full Name"
-            placeholder="Enter your full name"
-            value={name}
-            onChangeText={setName}
-            autoCapitalize="words"
-            required
-          />
-        )}
-
-        <InputField
-          label="Email"
-          placeholder="Enter your email"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          required
-        />
-
-        <InputField
-          label="Password"
-          placeholder="Enter your password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          required
-        />
-
-        {authError && <Text style={styles.errorText}>{authError}</Text>}
-
-        <Button
-          title={isLogin ? 'Sign In' : 'Create Account'}
-          onPress={handleAuth}
-          loading={formSubmitting}
-          fullWidth
-          style={styles.authButton}
-        />
-
-        <TouchableOpacity
-          style={styles.switchAuthMode}
-          onPress={() => setIsLogin(!isLogin)}>
-          <Text style={styles.switchAuthText}>
-            {isLogin
-              ? "Don't have an account? Sign Up"
-              : 'Already have an account? Sign In'}
-          </Text>
-        </TouchableOpacity>
-
-        {/* Demo Account Info */}
-        <View style={styles.demoContainer}>
-          <Text style={styles.demoTitle}>Demo Account</Text>
-          <Text style={styles.demoText}>Email: user@example.com</Text>
-          <Text style={styles.demoText}>Password: password123</Text>
-        </View>
-      </ScrollView>
-    );
+    return null;
   }
 
-  console.log(user);
-
-  // Profile Screen (when logged in)
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.contentContainer}>
       <View style={styles.profileHeader}>
         <View style={styles.profileImageContainer}>
-          {user.avatar ? (
-            <Image source={{uri: user.avatar}} style={styles.profileImage} />
+          {user.profilePicUrl ? (
+            <Image
+              source={{uri: user.profilePicUrl}}
+              style={styles.profileImage}
+            />
           ) : (
             <View style={styles.profileImagePlaceholder}>
-              {/* <UserIcon size={40} color={Colors.neutral[400]} /> */}
+              <UserIcon size={40} color={Colors.neutral[400]} />
             </View>
           )}
         </View>
-        <Text style={styles.profileName}>{user.name}</Text>
+        <Text style={styles.profileName}>{user.firstName}</Text>
         <Text style={styles.profileEmail}>{user.email}</Text>
       </View>
 
-      {/* Recent Orders */}
-      {userOrders.length > 0 && (
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recent Orders</Text>
-            <TouchableOpacity>
-              <Text style={styles.sectionAction}>View All</Text>
-            </TouchableOpacity>
-          </View>
-
-          {userOrders.slice(0, 2).map(order => (
-            <OrderCard key={order.id} order={order} onPress={() => {}} />
-          ))}
-        </View>
-      )}
-
-      {/* Account Settings */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Account Settings</Text>
 
@@ -231,7 +114,6 @@ export default function ProfileScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Logout */}
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
         <LogOut size={18} color={Colors.error[600]} style={styles.logoutIcon} />
         <Text style={styles.logoutText}>Logout</Text>
@@ -247,84 +129,12 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     paddingBottom: Spacing.xxl,
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: Spacing.sm,
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  header: {
-    paddingTop: Spacing.xxl,
-    paddingBottom: Spacing.lg,
-    alignItems: 'center',
-  },
-  title: {
-    fontFamily: Typography.fonts.bold,
-    fontSize: Typography.sizes.xxl,
-    color: Colors.text.primary,
-    marginBottom: Spacing.sm,
-  },
-  subtitle: {
-    fontFamily: Typography.fonts.regular,
-    fontSize: Typography.sizes.md,
-    color: Colors.text.tertiary,
-    textAlign: 'center',
-    marginBottom: Spacing.lg,
-  },
-  authButton: {
-    marginTop: Spacing.lg,
-    backgroundColor: Colors.primary[600],
-    borderRadius: Spacing.radius.lg,
-    paddingVertical: Spacing.md,
-    elevation: 3,
-    shadowColor: Colors.neutral[900],
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-  },
-  switchAuthMode: {
-    marginTop: Spacing.lg,
-    alignSelf: 'center',
-  },
-  switchAuthText: {
-    fontFamily: Typography.fonts.medium,
-    fontSize: Typography.sizes.md,
-    color: Colors.primary[600],
-    textDecorationLine: 'underline',
-  },
-  errorText: {
-    fontFamily: Typography.fonts.regular,
-    fontSize: Typography.sizes.sm,
-    color: Colors.error[600],
-    backgroundColor: Colors.error[50],
-    padding: Spacing.sm,
-    borderRadius: Spacing.radius.sm,
-    marginTop: Spacing.sm,
-    textAlign: 'center',
-  },
-  demoContainer: {
-    marginTop: Spacing.xl,
-    padding: Spacing.lg,
-    backgroundColor: Colors.neutral[50],
-    borderRadius: Spacing.radius.lg,
-    elevation: 2,
-    shadowColor: Colors.neutral[900],
-    shadowOffset: {width: 0, height: 1},
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-  },
-  demoTitle: {
-    fontFamily: Typography.fonts.semiBold,
-    fontSize: Typography.sizes.md,
-    color: Colors.text.primary,
-    marginBottom: Spacing.sm,
-  },
-  demoText: {
-    fontFamily: Typography.fonts.regular,
-    fontSize: Typography.sizes.sm,
-    color: Colors.text.secondary,
-    marginBottom: Spacing.xs,
   },
   profileHeader: {
     paddingHorizontal: Spacing.lg,
@@ -367,25 +177,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.lg,
     paddingBottom: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.neutral[100],
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.md,
   },
   sectionTitle: {
     fontFamily: Typography.fonts.semiBold,
     fontSize: Typography.sizes.lg,
     color: Colors.text.primary,
     marginBottom: Spacing.md,
-  },
-  sectionAction: {
-    fontFamily: Typography.fonts.medium,
-    fontSize: Typography.sizes.sm,
-    color: Colors.primary[600],
   },
   menuItem: {
     flexDirection: 'row',

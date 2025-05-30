@@ -1,12 +1,10 @@
 const Typography = {
-  // Font family
   fonts: {
     regular: 'Inter-Regular',
     medium: 'Inter-Medium',
     semiBold: 'Inter-SemiBold',
   },
-  
-  // Font sizes
+
   sizes: {
     xs: 12,
     sm: 14,
@@ -17,15 +15,13 @@ const Typography = {
     xxxl: 30,
     display: 36,
   },
-  
-  // Line heights - multiple of font size
+
   lineHeights: {
-    tight: 1.2,     // For headings
-    normal: 1.5,    // For body text
-    loose: 1.8,     // For readable paragraphs
+    tight: 1.2,
+    normal: 1.5,
+    loose: 1.8,
   },
-  
-  // Letter spacing
+
   letterSpacing: {
     tighter: -0.8,
     tight: -0.4,
