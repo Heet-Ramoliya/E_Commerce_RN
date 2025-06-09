@@ -19,6 +19,7 @@ import Typography from '../../constants/Typography';
 import {launchImageLibrary} from 'react-native-image-picker';
 import {useAuth} from '../../context/AuthContext';
 import {showToast} from '../../components/Toast';
+import {string} from '../../constants/string';
 
 export default function SignupScreen() {
   const navigation = useNavigation();
@@ -79,9 +80,9 @@ export default function SignupScreen() {
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Text style={styles.title}>Create Account</Text>
+          <Text style={styles.title}>{string.create_account}</Text>
           <Text style={styles.subtitle}>
-            Join us to shop and enjoy exclusive offers
+            {string.join_us_to_shop_and_enjoy_exclusive_offers}
           </Text>
         </View>
 
@@ -90,7 +91,7 @@ export default function SignupScreen() {
             onPress={handleImagePick}
             style={[styles.avatar, authLoading && styles.disabledAvatar]}
             disabled={authLoading}
-            accessibilityLabel="Upload profile picture">
+            accessibilityLabel={string.upload_profile_picture_accessibility}>
             {profilePic ? (
               <Image
                 source={{uri: profilePic.uri}}
@@ -100,31 +101,31 @@ export default function SignupScreen() {
               <ImageIcon size={40} color={Colors.primary[600]} />
             )}
           </TouchableOpacity>
-          <Text style={styles.avatarText}>Upload Profile Picture</Text>
+          <Text style={styles.avatarText}>{string.upload_profile_picture}</Text>
         </View>
 
         <InputField
-          label="First Name"
-          placeholder="Enter your first name"
+          label={string.first_name}
+          placeholder={string.enter_first_name}
           value={firstName}
           onChangeText={setFirstName}
           required
           leftIcon={<User size={20} color={Colors.primary[600]} />}
           style={styles.input}
           editable={!authLoading}
-          accessibilityLabel="First name input"
+          accessibilityLabel={string.first_name_input_accessibility}
         />
 
         <InputField
-          label="Last Name"
-          placeholder="Enter your last name"
+          label={string.last_name}
+          placeholder={string.enter_last_name}
           value={lastName}
           onChangeText={setLastName}
           required
           leftIcon={<User size={20} color={Colors.primary[600]} />}
           style={styles.input}
           editable={!authLoading}
-          accessibilityLabel="Last name input"
+          accessibilityLabel={string.last_name_input_accessibility}
         />
 
         <View
@@ -132,23 +133,23 @@ export default function SignupScreen() {
             styles.pickerContainer,
             authLoading && styles.disabledPicker,
           ]}>
-          <Text style={styles.label}>Gender</Text>
+          <Text style={styles.label}>{string.gender}</Text>
           <Picker
             selectedValue={gender}
             onValueChange={setGender}
             style={styles.picker}
             enabled={!authLoading}
-            accessibilityLabel="Gender selector">
-            <Picker.Item label="Select Gender" value="" />
-            <Picker.Item label="Male" value="male" />
-            <Picker.Item label="Female" value="female" />
-            <Picker.Item label="Other" value="other" />
+            accessibilityLabel={string.gender_selector_accessibility}>
+            <Picker.Item label={string.select_gender} value="" />
+            <Picker.Item label={string.male} value="male" />
+            <Picker.Item label={string.female} value="female" />
+            <Picker.Item label={string.other} value="other" />
           </Picker>
         </View>
 
         <InputField
-          label="Email Address"
-          placeholder="Enter your email"
+          label={string.email_address}
+          placeholder={string.enter_email}
           value={email}
           onChangeText={setEmail}
           keyboardType="email-address"
@@ -156,12 +157,12 @@ export default function SignupScreen() {
           leftIcon={<Mail size={20} color={Colors.primary[600]} />}
           style={styles.input}
           editable={!authLoading}
-          accessibilityLabel="Email input"
+          accessibilityLabel={string.email_input_accessibility}
         />
 
         <InputField
-          label="Password"
-          placeholder="Enter your password"
+          label={string.password}
+          placeholder={string.enter_password}
           value={password}
           onChangeText={setPassword}
           secureTextEntry
@@ -169,12 +170,12 @@ export default function SignupScreen() {
           leftIcon={<Lock size={20} color={Colors.primary[600]} />}
           style={styles.input}
           editable={!authLoading}
-          accessibilityLabel="Password input"
+          accessibilityLabel={string.password_input_accessibility}
         />
 
         <InputField
-          label="Confirm Password"
-          placeholder="Confirm your password"
+          label={string.confirm_password}
+          placeholder={string.confirm_your_password}
           value={confirmPassword}
           onChangeText={setConfirmPassword}
           secureTextEntry
@@ -182,7 +183,7 @@ export default function SignupScreen() {
           leftIcon={<Lock size={20} color={Colors.primary[600]} />}
           style={styles.input}
           editable={!authLoading}
-          accessibilityLabel="Confirm password input"
+          accessibilityLabel={string.confirm_password_input_accessibility}
         />
 
         <View style={styles.buttonContainer}>
@@ -190,7 +191,7 @@ export default function SignupScreen() {
             colors={[Colors.primary[600], Colors.primary[500]]}
             style={styles.gradientButton}>
             <Button
-              title="Create Account"
+              title={string.create_account_btn}
               onPress={handleRegister}
               loading={authLoading}
               fullWidth
@@ -203,39 +204,39 @@ export default function SignupScreen() {
         </View>
 
         <View style={styles.socialLoginContainer}>
-          <Text style={styles.socialLoginText}>Or sign up with</Text>
+          <Text style={styles.socialLoginText}>{string.or_sign_up_with}</Text>
           <View style={styles.socialButtons}>
             <TouchableOpacity
               style={styles.socialButton}
               disabled={authLoading}
-              accessibilityLabel="Sign up with Google">
+              accessibilityLabel={string.sign_up_with_google}>
               <Image
                 source={require('../../assets/images/google.png')}
                 style={styles.socialButtonImage}
               />
-              <Text style={styles.socialButtonText}>Google</Text>
+              <Text style={styles.socialButtonText}>{string.google}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.socialButton}
               disabled={authLoading}
-              accessibilityLabel="Sign up with Facebook">
+              accessibilityLabel={string.sign_up_with_facebook}>
               <Image
                 source={require('../../assets/images/facebook.png')}
                 style={styles.socialButtonImage}
               />
-              <Text style={styles.socialButtonText}>Facebook</Text>
+              <Text style={styles.socialButtonText}>{string.facebook}</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         <View style={styles.switchAuthMode}>
           <TouchableOpacity
-            onPress={() => navigation.navigate('Login')}
+            onPress={() => navigation.navigate('login')}
             disabled={authLoading}
-            accessibilityLabel="Navigate to login screen">
+            accessibilityLabel={string.navigate_to_login_screen}>
             <Text style={styles.switchAuthText}>
-              Already have an account?{' '}
-              <Text style={styles.signUpLink}>Sign In</Text>
+              {string.already_have_an_account}{' '}
+              <Text style={styles.signUpLink}>{string.sign_in}</Text>
             </Text>
           </TouchableOpacity>
         </View>

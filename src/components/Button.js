@@ -154,7 +154,7 @@ const Button = ({
 const styles = StyleSheet.create({
   button: {
     borderRadius: Spacing.radius.md,
-    paddingVertical: Spacing.sm,
+    paddingVertical: Spacing.xs,
     paddingHorizontal: Spacing.md,
     flexDirection: 'row',
     justifyContent: 'center',

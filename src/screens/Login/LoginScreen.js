@@ -16,6 +16,7 @@ import Colors from '../../constants/Colors';
 import Spacing from '../../constants/Spacing';
 import Typography from '../../constants/Typography';
 import {useAuth} from '../../context/AuthContext';
+import {string} from '../../constants/string';
 
 export default function LoginScreen() {
   const navigation = useNavigation();
@@ -24,12 +25,12 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
 
   const handleLogin = async () => {
-    const {success, isAdmin} = await login(email, password);
+    const {success} = await login(email, password);
 
     if (success) {
       setEmail('');
       setPassword('');
-      navigation.navigate(isAdmin ? 'AdminTab' : 'BottomTab');
+      navigation.navigate('BottomTab');
     }
   };
 
@@ -41,15 +42,15 @@ export default function LoginScreen() {
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Text style={styles.title}>Welcome Back</Text>
+          <Text style={styles.title}>{string.welcome_back}</Text>
           <Text style={styles.subtitle}>
-            Sign in to explore exclusive deals and manage your orders
+            {string.sign_in_to_explore_exclusive_deals_and_manage_your_orders}
           </Text>
         </View>
 
         <InputField
-          label="Email Address"
-          placeholder="Enter your email"
+          label={string.email_address}
+          placeholder={string.enter_email}
           value={email}
           onChangeText={setEmail}
           keyboardType="email-address"
@@ -57,12 +58,12 @@ export default function LoginScreen() {
           leftIcon={<Mail size={20} color={Colors.primary[600]} />}
           style={styles.input}
           editable={!authLoading}
-          accessibilityLabel="Email input"
+          accessibilityLabel={string.email_input_accessibility}
         />
 
         <InputField
-          label="Password"
-          placeholder="Enter your password"
+          label={string.password}
+          placeholder={string.enter_password}
           value={password}
           onChangeText={setPassword}
           secureTextEntry
@@ -70,7 +71,7 @@ export default function LoginScreen() {
           leftIcon={<Lock size={20} color={Colors.primary[600]} />}
           style={styles.input}
           editable={!authLoading}
-          accessibilityLabel="Password input"
+          accessibilityLabel={string.password_input_accessibility}
         />
 
         <View style={styles.buttonContainer}>
@@ -78,7 +79,7 @@ export default function LoginScreen() {
             colors={[Colors.primary[600], Colors.primary[500]]}
             style={styles.gradientButton}>
             <Button
-              title="Sign In"
+              title={string.sign_in}
               onPress={handleLogin}
               loading={authLoading}
               fullWidth
@@ -91,27 +92,27 @@ export default function LoginScreen() {
         </View>
 
         <View style={styles.socialLogin}>
-          <Text style={styles.socialLoginText}>Or sign in with</Text>
+          <Text style={styles.socialLoginText}>{string.or_sign_in_with}</Text>
           <View style={styles.socialButtons}>
             <TouchableOpacity
               style={styles.socialButton}
               disabled={authLoading}
-              accessibilityLabel="Sign in with Google">
+              accessibilityLabel={string.sign_up_with_google}>
               <Image
                 source={require('../../assets/images/google.png')}
                 style={styles.socialButtonImage}
               />
-              <Text style={styles.socialButtonText}>Google</Text>
+              <Text style={styles.socialButtonText}>{string.google}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.socialButton}
               disabled={authLoading}
-              accessibilityLabel="Sign in with Facebook">
+              accessibilityLabel={string.sign_up_with_facebook}>
               <Image
                 source={require('../../assets/images/facebook.png')}
                 style={styles.socialButtonImage}
               />
-              <Text style={styles.socialButtonText}>Facebook</Text>
+              <Text style={styles.socialButtonText}>{string.facebook}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -122,8 +123,8 @@ export default function LoginScreen() {
             disabled={authLoading}
             accessibilityLabel="Navigate to sign up screen">
             <Text style={styles.switchAuthText}>
-              Don't have an account?{' '}
-              <Text style={styles.signUpLink}>Sign Up</Text>
+              {string.do_not_have_an_account}{' '}
+              <Text style={styles.signUpLink}>{string.sign_up}</Text>
             </Text>
           </TouchableOpacity>
         </View>

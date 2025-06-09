@@ -8,6 +8,7 @@ import Spacing from '../../constants/Spacing';
 import Typography from '../../constants/Typography';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {showToast} from '../../components/Toast';
+import {string} from '../../constants/string';
 
 export default function SplashScreen() {
   const navigation = useNavigation();
@@ -35,7 +36,7 @@ export default function SplashScreen() {
     const checkUserAndNavigate = async () => {
       const user = await getUser();
       if (user && user.uid) {
-        navigation.replace(user.isAdmin ? 'AdminTab' : 'BottomTab');
+        navigation.replace('BottomTab');
       } else {
         navigation.replace('login');
       }
@@ -56,7 +57,7 @@ export default function SplashScreen() {
         <View style={styles.iconContainer}>
           <ShoppingBag size={80} />
         </View>
-        <Text style={styles.appName}>ShopEase</Text>
+        <Text style={styles.appName}>{string.shopease}</Text>
         <ActivityIndicator
           size="large"
           color={Colors.background}

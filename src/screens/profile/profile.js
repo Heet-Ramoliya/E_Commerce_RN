@@ -33,7 +33,7 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     if (!authLoading && !user) {
-      navigation.navigate('login');
+      navigation.replace('login');
     }
   }, [authLoading, user, navigation]);
 

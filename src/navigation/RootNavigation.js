@@ -9,7 +9,6 @@ import SearchScreen from '../screens/search/search';
 import LoginScreen from '../screens/Login/LoginScreen';
 import SignupScreen from '../screens/signup/SignupScreen';
 import SplashScreen from '../screens/splash/SplashScreen';
-import AdminBottomTabNavigation from './AdminNavigation';
 
 const Stack = createStackNavigator();
 
@@ -20,7 +19,6 @@ const RootNavigation = () => {
       <Stack.Screen name="login" component={LoginScreen} />
       <Stack.Screen name="signup" component={SignupScreen} />
       <Stack.Screen name="BottomTab" component={BottomTabNavigation} />
-      <Stack.Screen name="AdminTab" component={AdminBottomTabNavigation} />
       <Stack.Screen name="Product" component={ProductScreen} />
       <Stack.Screen name="Checkout" component={CheckoutScreen} />
       <Stack.Screen name="Homescreen" component={Homescreen} />
