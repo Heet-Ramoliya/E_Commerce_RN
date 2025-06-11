@@ -7,24 +7,29 @@ import {
   TouchableOpacity,
   Platform,
 } from 'react-native';
-import {Star} from 'lucide-react-native';
 import Colors from '../constants/Colors';
 import Spacing from '../constants/Spacing';
 import Typography from '../constants/Typography';
 import {useCart} from '../context/CartContext';
 import {useNavigation} from '@react-navigation/native';
 
+const FALLBACK_IMAGE = 'https://via.placeholder.com/150';
+
 const ProductCard = ({product}) => {
   const navigation = useNavigation();
   const {addToCart} = useCart();
 
   const handlePress = () => {
-    navigation.navigate(`Product/${product.id}`);
+    navigation.navigate('Product', {id: product.id});
   };
 
   const handleAddToCart = () => {
     addToCart(product);
   };
+
+  const imageUri = Array.isArray(product.imageUrls)
+    ? product.imageUrls[0]
+    : product.imageUrls || FALLBACK_IMAGE;
 
   return (
     <TouchableOpacity
@@ -32,32 +37,23 @@ const ProductCard = ({product}) => {
       onPress={handlePress}
       activeOpacity={0.9}>
       <View style={styles.imageContainer}>
-        <Image source={{uri: product.image}} style={styles.image} />
-        {product.isNew && (
-          <View style={styles.newBadge}>
-            <Text style={styles.newBadgeText}>NEW</Text>
-          </View>
-        )}
+        <Image
+          source={{uri: imageUri}}
+          style={styles.image}
+          defaultSource={{uri: FALLBACK_IMAGE}}
+        />
       </View>
 
       <View style={styles.contentContainer}>
-        <Text style={styles.category}>{product.category}</Text>
+        <Text style={styles.category}>{product.category || 'Unknown'}</Text>
         <Text style={styles.name} numberOfLines={2}>
-          {product.name}
+          {product.name || 'Unnamed Product'}
         </Text>
 
-        <View style={styles.ratingContainer}>
-          <Star
-            size={14}
-            color={Colors.warning[500]}
-            fill={Colors.warning[500]}
-          />
-          <Text style={styles.rating}>{product.rating}</Text>
-          <Text style={styles.reviewCount}>({product.reviewCount})</Text>
-        </View>
-
         <View style={styles.priceRow}>
-          <Text style={styles.price}>${product.price.toFixed(2)}</Text>
+          <Text style={styles.price}>
+            ${product.price ? product.price.toFixed(2) : '0.00'}
+          </Text>
           <TouchableOpacity style={styles.addButton} onPress={handleAddToCart}>
             <Text style={styles.addButtonText}>Add</Text>
           </TouchableOpacity>
@@ -96,9 +92,9 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   image: {
-    width: '100%',
+    width: '230',
     height: '100%',
-    resizeMode: 'cover',
+    resizeMode: 'contain',
   },
   newBadge: {
     position: 'absolute',
@@ -129,23 +125,6 @@ const styles = StyleSheet.create({
     color: Colors.text.primary,
     marginBottom: Spacing.sm,
     height: 44,
-  },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
-  },
-  rating: {
-    fontSize: Typography.sizes.sm,
-    fontFamily: Typography.fonts.medium,
-    color: Colors.text.secondary,
-    marginLeft: Spacing.xs,
-  },
-  reviewCount: {
-    fontSize: Typography.sizes.sm,
-    fontFamily: Typography.fonts.regular,
-    color: Colors.text.tertiary,
-    marginLeft: Spacing.xs,
   },
   priceRow: {
     flexDirection: 'row',

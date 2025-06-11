@@ -16,80 +16,138 @@ import Typography from '../../constants/Typography';
 import ProductCard from '../../components/ProductCard';
 import CategoryCard from '../../components/CategoryCard';
 import {
-  getCategories,
-  searchProducts,
-  getProductsByCategory,
-  getFeaturedProducts,
-  getNewProducts,
-} from '../../data/products';
+  collection,
+  onSnapshot,
+  query,
+  where,
+} from '@react-native-firebase/firestore';
+import {db} from '../../config/firebase';
 import {useNavigation, useRoute} from '@react-navigation/native';
 
 export default function SearchScreen() {
   const navigation = useNavigation();
   const route = useRoute();
-  const {category, featured, new: isNew} = route.params || {};
+  const {category} = route.params || {};
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState(category || null);
+  const [selectedCategory, setSelectedCategory] = useState(
+    category ? category.toLowerCase() : null,
+  );
   const [loading, setLoading] = useState(true);
 
+  console.log('Route category:', category);
+  console.log('Selected category:', selectedCategory);
+
   useEffect(() => {
-    const loadData = async () => {
-      // Simulate network request
-      await new Promise(resolve => setTimeout(resolve, 300));
+    // Fetch categories
+    const unsubscribeCategories = onSnapshot(
+      collection(db, 'products'),
+      snapshot => {
+        const categoriesData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          name: doc.data().category,
+        }));
+        const uniqueCategories = Array.from(
+          new Set(categoriesData.map(cat => cat.name)),
+        ).map(name => categoriesData.find(cat => cat.name === name));
+        setCategories(uniqueCategories);
+        // Validate route category
+        if (category && !selectedCategory) {
+          const matchedCategory = uniqueCategories.find(
+            cat => cat.name.toLowerCase() === category.toLowerCase(),
+          );
+          if (matchedCategory) {
+            setSelectedCategory(matchedCategory.name.toLowerCase());
+          }
+        }
+        setLoading(false);
+      },
+      error => {
+        console.error('Error fetching categories:', error);
+        setLoading(false);
+      },
+    );
 
-      const allCategories = getCategories();
-      setCategories(allCategories);
+    return () => unsubscribeCategories();
+  }, [category]);
 
-      // Handle initial search results based on params
-      if (featured) {
-        setSearchResults(getFeaturedProducts());
-      } else if (isNew) {
-        setSearchResults(getNewProducts());
-      } else if (category) {
-        setSelectedCategory(category);
-        setSearchResults(getProductsByCategory(category));
-      } else {
-        setSearchResults([]);
-      }
+  useEffect(() => {
+    // Fetch products based on searchQuery or selectedCategory
+    let unsubscribeProducts;
 
-      setLoading(false);
+    console.log(
+      'Fetching products for searchQuery:',
+      searchQuery,
+      'selectedCategory:',
+      selectedCategory,
+    );
+
+    if (searchQuery.trim()) {
+      // Search products by name (case-insensitive)
+      const q = query(
+        collection(db, 'products'),
+        where('name', '>=', searchQuery),
+        where('name', '<=', searchQuery + '\uf8ff'),
+      );
+      unsubscribeProducts = onSnapshot(
+        q,
+        snapshot => {
+          const productsData = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
+          console.log('Search results:', productsData);
+          setSearchResults(productsData);
+        },
+        error => {
+          console.error('Error searching products:', error);
+          setSearchResults([]);
+        },
+      );
+    } else if (selectedCategory) {
+      // Filter products by category
+      const q = query(
+        collection(db, 'products'),
+        where('category', '==', selectedCategory),
+      );
+      unsubscribeProducts = onSnapshot(
+        q,
+        snapshot => {
+          const productsData = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
+          console.log('Category products:', productsData);
+          setSearchResults(productsData);
+        },
+        error => {
+          console.error('Error fetching products by category:', error);
+          setSearchResults([]);
+        },
+      );
+    } else {
+      setSearchResults([]);
+    }
+
+    return () => {
+      if (unsubscribeProducts) unsubscribeProducts();
     };
-
-    loadData();
-  }, [category, featured, isNew]);
+  }, [searchQuery, selectedCategory]);
 
   const handleSearch = query => {
     setSearchQuery(query);
-
-    if (query.trim() === '') {
-      if (selectedCategory) {
-        setSearchResults(getProductsByCategory(selectedCategory));
-      } else {
-        setSearchResults([]);
-      }
-      return;
-    }
-
-    const results = searchProducts(query);
-    setSearchResults(results);
   };
 
-  const handleCategorySelect = category => {
-    setSelectedCategory(category);
-    setSearchResults(getProductsByCategory(category));
+  const handleCategorySelect = categoryName => {
+    console.log('Selecting category:', categoryName);
+    setSelectedCategory(categoryName);
     setSearchQuery('');
   };
 
   const clearSearch = () => {
     setSearchQuery('');
-    if (selectedCategory) {
-      setSearchResults(getProductsByCategory(selectedCategory));
-    } else {
-      setSearchResults([]);
-    }
   };
 
   const renderEmptyState = () => {
@@ -101,7 +159,7 @@ export default function SearchScreen() {
       );
     }
 
-    if (searchQuery.trim() !== '' && searchResults.length === 0) {
+    if (searchQuery.trim() && searchResults.length === 0) {
       return (
         <View style={styles.emptyStateContainer}>
           <Text style={styles.emptyStateTitle}>No results found</Text>
@@ -112,7 +170,18 @@ export default function SearchScreen() {
       );
     }
 
-    if (!selectedCategory && searchQuery.trim() === '') {
+    if (selectedCategory && searchResults.length === 0) {
+      return (
+        <View style={styles.emptyStateContainer}>
+          <Text style={styles.emptyStateTitle}>No products found</Text>
+          <Text style={styles.emptyStateText}>
+            No products available in the "{selectedCategory}" category
+          </Text>
+        </View>
+      );
+    }
+
+    if (!selectedCategory && !searchQuery.trim()) {
       return (
         <View style={styles.emptyStateContainer}>
           <Text style={styles.emptyStateTitle}>Find products</Text>
@@ -162,10 +231,10 @@ export default function SearchScreen() {
           contentContainerStyle={styles.categoriesScrollContainer}>
           {categories.map(category => (
             <CategoryCard
-              key={category}
-              category={category}
-              isSelected={selectedCategory === category}
-              onPress={() => handleCategorySelect(category)}
+              key={category.id}
+              category={category.name}
+              isSelected={selectedCategory === category.name}
+              onPress={() => handleCategorySelect(category.name)}
             />
           ))}
         </ScrollView>
@@ -234,7 +303,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   productCardContainer: {
-    width: '48%',
     marginBottom: Spacing.md,
   },
   emptyStateContainer: {

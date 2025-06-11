@@ -3,12 +3,14 @@ import BottomTabNavigation from './BottomTabNavigation';
 import CheckoutScreen from '../screens/checkout/checkout';
 import Homescreen from '../screens/home/Homescreen';
 import NotFoundScreen from '../components/not-found';
-import ProductScreen from '../screens/product/[id]';
+import ProductScreen from '../screens/product/ProductScreen';
 import ProfileScreen from '../screens/profile/profile';
 import SearchScreen from '../screens/search/search';
 import LoginScreen from '../screens/Login/LoginScreen';
 import SignupScreen from '../screens/signup/SignupScreen';
 import SplashScreen from '../screens/splash/SplashScreen';
+import Orders from '../screens/orders/Orders';
+import OrderDetails from '../screens/orders/OrderDetails';
 
 const Stack = createStackNavigator();
 
@@ -25,6 +27,8 @@ const RootNavigation = () => {
       <Stack.Screen name="NotFound" component={NotFoundScreen} />
       <Stack.Screen name="profile" component={ProfileScreen} />
       <Stack.Screen name="search" component={SearchScreen} />
+      <Stack.Screen name="orders" component={Orders} />
+      <Stack.Screen name="OrderDetails" component={OrderDetails} />
     </Stack.Navigator>
   );
 };

@@ -16,7 +16,6 @@ const AuthContext = createContext(null);
 
 export const AuthProvider = ({children}) => {
   const [user, setUser] = useState(null);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [authLoading, setAuthLoading] = useState(false);
 
@@ -24,38 +23,22 @@ export const AuthProvider = ({children}) => {
     const unsubscribe = onAuthStateChanged(auth, async firebaseUser => {
       try {
         if (firebaseUser) {
-          const isAdminUser = firebaseUser.email === String(Config.ADMIN_EMAIL);
-
           let userData;
-
-          if (isAdminUser) {
+          const userDoc = await getDoc(doc(db, 'Users', firebaseUser.uid));
+          if (userDoc.exists()) {
             userData = {
               uid: firebaseUser.uid,
               email: firebaseUser.email,
-              firstName: 'Admin',
-              lastName: 'User',
-              isAdmin: true,
+              ...userDoc.data(),
             };
           } else {
-            const userDoc = await getDoc(doc(db, 'Users', firebaseUser.uid));
-            if (userDoc.exists()) {
-              userData = {
-                uid: firebaseUser.uid,
-                email: firebaseUser.email,
-                ...userDoc.data(),
-                isAdmin: false,
-              };
-            } else {
-              await signOut(auth);
-              setUser(null);
-              setIsAdmin(false);
-              await AsyncStorage.removeItem('user');
-              return;
-            }
+            await signOut(auth);
+            setUser(null);
+            await AsyncStorage.removeItem('user');
+            return;
           }
 
           setUser(userData);
-          setIsAdmin(isAdminUser);
           try {
             await AsyncStorage.setItem('user', JSON.stringify(userData));
           } catch (storageError) {
@@ -67,7 +50,6 @@ export const AuthProvider = ({children}) => {
         } else {
           console.log('No Firebase user, clearing AsyncStorage');
           setUser(null);
-          setIsAdmin(false);
           await AsyncStorage.removeItem('user');
         }
       } catch (error) {
@@ -78,7 +60,6 @@ export const AuthProvider = ({children}) => {
           message: 'Failed to sync user data.',
         });
         setUser(null);
-        setIsAdmin(false);
         await AsyncStorage.removeItem('user');
       } finally {
         setLoading(false);
@@ -91,7 +72,6 @@ export const AuthProvider = ({children}) => {
         if (storedUser) {
           const parsedUser = JSON.parse(storedUser);
           setUser(parsedUser);
-          setIsAdmin(parsedUser.isAdmin || false);
         }
       } catch (error) {
         console.error('Failed to load cached user:', error);
@@ -152,7 +132,7 @@ export const AuthProvider = ({children}) => {
           title: 'Invalid Email',
           message: 'Please enter a valid email address.',
         });
-        return {success: false, isAdmin: false};
+        return {success: false};
       }
       if (!password || password.length < 8) {
         showToast({
@@ -160,12 +140,8 @@ export const AuthProvider = ({children}) => {
           title: 'Invalid Password',
           message: 'Password must be at least 8 characters long.',
         });
-        return {success: false, isAdmin: false};
+        return {success: false};
       }
-
-      const isAdminUser =
-        email === String(Config.ADMIN_EMAIL) &&
-        password === String(Config.ADMIN_PASSWORD);
 
       const userCredential = await signInWithEmailAndPassword(
         auth,
@@ -175,34 +151,22 @@ export const AuthProvider = ({children}) => {
       const firebaseUser = userCredential.user;
 
       let userData;
-
-      if (isAdminUser) {
+      const userDoc = await getDoc(doc(db, 'Users', firebaseUser.uid));
+      if (userDoc.exists()) {
         userData = {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
-          firstName: 'Admin',
-          lastName: 'User',
-          isAdmin: true,
+          ...userDoc.data(),
         };
       } else {
-        const userDoc = await getDoc(doc(db, 'Users', firebaseUser.uid));
-        if (userDoc.exists()) {
-          userData = {
-            uid: firebaseUser.uid,
-            email: firebaseUser.email,
-            ...userDoc.data(),
-            isAdmin: false,
-          };
-        } else {
-          console.error('No Firestore document for user:', firebaseUser.uid);
-          showToast({
-            type: 'error',
-            title: 'Profile Error',
-            message: 'User profile not found. Please contact support.',
-          });
-          await signOut(auth);
-          return {success: false, isAdmin: false};
-        }
+        console.error('No Firestore document for user:', firebaseUser.uid);
+        showToast({
+          type: 'error',
+          title: 'Profile Error',
+          message: 'User profile not found. Please contact support.',
+        });
+        await signOut(auth);
+        return {success: false};
       }
 
       try {
@@ -217,13 +181,12 @@ export const AuthProvider = ({children}) => {
       }
 
       setUser(userData);
-      setIsAdmin(isAdminUser);
       showToast({
         type: 'success',
         title: 'Login Successful',
-        message: `Welcome back, ${isAdminUser ? 'Admin' : userData.firstName}!`,
+        message: `Welcome back, ${userData.firstName}!`,
       });
-      return {success: true, isAdmin: isAdminUser};
+      return {success: true};
     } catch (error) {
       let errorMessage = 'Failed to log in.';
       switch (error.code) {
@@ -247,7 +210,7 @@ export const AuthProvider = ({children}) => {
         title: 'Login Error',
         message: errorMessage,
       });
-      return {success: false, isAdmin: false};
+      return {success: false};
     } finally {
       setAuthLoading(false);
     }
@@ -330,13 +293,11 @@ export const AuthProvider = ({children}) => {
         email,
         profilePicUrl: profilePicUrl || null,
         createdAt: new Date().toISOString(),
-        isAdmin: false,
       };
 
       await setDoc(doc(db, 'Users', user.uid), userData);
 
       setUser({uid: user.uid, email: user.email, ...userData});
-      setIsAdmin(false);
       await AsyncStorage.setItem(
         'user',
         JSON.stringify({uid: user.uid, email: user.email, ...userData}),
@@ -380,7 +341,6 @@ export const AuthProvider = ({children}) => {
         await signOut(auth);
       }
       setUser(null);
-      setIsAdmin(false);
       await AsyncStorage.removeItem('user');
       showToast({
         type: 'success',
@@ -403,7 +363,7 @@ export const AuthProvider = ({children}) => {
 
   return (
     <AuthContext.Provider
-      value={{user, isAdmin, loading, authLoading, login, register, logout}}>
+      value={{user, loading, authLoading, login, register, logout}}>
       {children}
     </AuthContext.Provider>
   );

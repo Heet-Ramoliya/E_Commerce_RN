@@ -18,7 +18,9 @@ import Typography from '../../constants/Typography';
 import {useCart} from '../../context/CartContext';
 import {useStripe} from '@stripe/stripe-react-native';
 import {useAuth} from '../../context/AuthContext';
-import {createOrder} from '../../data/orders';
+import {db} from '../../config/firebase';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import Header from '../../components/Header';
 
 export default function CheckoutScreen() {
   const navigation = useNavigation();
@@ -32,13 +34,17 @@ export default function CheckoutScreen() {
   const [paymentIntentId, setPaymentIntentId] = useState(null);
 
   const [shippingForm, setShippingForm] = useState({
-    name: user?.name || '',
+    name: user
+      ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || ''
+      : '',
     street: '',
     city: '',
     state: '',
     zip: '',
     country: 'United States',
   });
+
+  const insets = useSafeAreaInsets();
 
   const subtotal = getCartTotal();
   const standardShipping = subtotal > 100 ? 0 : 10;
@@ -68,39 +74,74 @@ export default function CheckoutScreen() {
   };
 
   const handlePlaceOrder = async () => {
-    const newOrder = createOrder({
-      userId: user.id,
-      status: 'Processing',
-      items: cart.map(item => ({
-        productId: item.id,
-        name: item.name,
-        price: item.price,
-        quantity: item.quantity,
-        image: item.image,
-      })),
-      subtotal,
-      shipping,
-      tax,
-      total,
-      shippingAddress: shippingForm,
-      shippingMethod: isExpressShipping ? 'Express' : 'Standard',
-      paymentMethod: 'Card',
-      paymentIntentId,
-    });
+    setProcessing(true);
+    try {
+      if (!user?.uid) {
+        throw new Error('User is not authenticated');
+      }
+      if (!cart?.length) {
+        throw new Error('Cart is empty');
+      }
+      if (!paymentIntentId) {
+        throw new Error('Payment Intent ID is missing');
+      }
+      const {name, street, city, state, zip, country} = shippingForm;
+      if (!name || !street || !city || !state || !zip || !country) {
+        throw new Error('Incomplete shipping information');
+      }
 
-    clearCart();
-    navigation.replace('BottomTab', {screen: 'Home'});
+      const newOrder = {
+        userId: user.uid,
+        status: 'Processing',
+        customer: {
+          firstName: user.firstName || '',
+          lastName: user.lastName || '',
+          email: user.email || '',
+        },
+        items: cart.map(item => ({
+          productId: item.id ?? '',
+          name: item.name ?? '',
+          price: Number(item.price) || 0,
+          quantity: Number(item.quantity) || 1,
+          image: item.imageUrls?.[0] ?? '',
+        })),
+        subtotal: Number(subtotal) || 0,
+        tax: Number(tax) || 0,
+        total: Number(total) || 0,
+        shippingAddress: {
+          name: name ?? '',
+          street: street ?? '',
+          city: city ?? '',
+          state: state ?? '',
+          zip: zip ?? '',
+          country: country ?? 'India',
+        },
+        shippingMethod: isExpressShipping ? 'Express' : 'Standard',
+        paymentMethod: 'Card',
+        paymentIntentId: paymentIntentId ?? '',
+        createdAt: new Date(),
+      };
 
-    Alert.alert(
-      'Order Placed Successfully',
-      `Your order #${newOrder.id} has been placed and is being processed.`,
-      [{text: 'OK'}],
-    );
+      console.log('New Order:', JSON.stringify(newOrder, null, 2));
+
+      const orderRef = await db.collection('orders').add(newOrder);
+
+      clearCart();
+
+      navigation.replace('BottomTab', {screen: 'Home'});
+
+      Alert.alert(
+        'Order Placed Successfully',
+        `Your order #${orderRef.id} has been placed and is being processed.`,
+        [{text: 'OK'}],
+      );
+    } catch (error) {
+      console.error('Error saving order to Firestore:', error);
+      Alert.alert('Error', `Failed to place the order: ${error.message}`);
+    } finally {
+      setProcessing(false);
+    }
   };
-
-  useEffect(() => {
-    initializePaymentSheet();
-  }, [isExpressShipping]);
 
   const fetchPaymentSheetParams = async () => {
     try {
@@ -110,7 +151,7 @@ export default function CheckoutScreen() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          amount: total * 100,
+          amount: Math.round(total * 100),
           currency: 'usd',
         }),
       });
@@ -121,12 +162,7 @@ export default function CheckoutScreen() {
         );
       }
       const {paymentIntent, ephemeralKey, customer} = await response.json();
-
-      return {
-        paymentIntent,
-        ephemeralKey,
-        customer,
-      };
+      return {paymentIntent, ephemeralKey, customer};
     } catch (error) {
       console.error('Error fetching payment sheet params:', error);
       throw error;
@@ -134,59 +170,58 @@ export default function CheckoutScreen() {
   };
 
   const initializePaymentSheet = async () => {
-    const {paymentIntent, ephemeralKey, customer} =
-      await fetchPaymentSheetParams();
-
-    const {error} = await initPaymentSheet({
-      merchantDisplayName: 'E-Commerce',
-      customerId: customer,
-      customerEphemeralKeySecret: ephemeralKey,
-      paymentIntentClientSecret: paymentIntent,
-      allowsDelayedPaymentMethods: true,
-      defaultBillingDetails: {
-        name: 'Jane Doe',
-      },
-    });
-    if (!error) {
-      setLoading(true);
+    try {
+      const {paymentIntent, ephemeralKey, customer} =
+        await fetchPaymentSheetParams();
+      setPaymentIntentId(paymentIntent); // Set paymentIntentId
+      const {error} = await initPaymentSheet({
+        merchantDisplayName: 'E-Commerce',
+        customerId: customer,
+        customerEphemeralKeySecret: ephemeralKey,
+        paymentIntentClientSecret: paymentIntent,
+        allowsDelayedPaymentMethods: true,
+        defaultBillingDetails: {
+          name: shippingForm.name || 'Jane Doe',
+        },
+      });
+      if (error) {
+        console.error('Error initializing payment sheet:', error);
+        Alert.alert('Error', 'Failed to initialize payment. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error in initializePaymentSheet:', error);
     }
   };
 
   const openPaymentSheet = async () => {
     setProcessing(true);
-    const {error} = await presentPaymentSheet();
-
-    if (error) {
-      setProcessing(false);
-      Alert.alert(`Error code: ${error.code}`, error.message);
-    } else {
-      await handlePlaceOrder();
+    try {
+      const {paymentIntent} = await fetchPaymentSheetParams();
+      if (!paymentIntent) {
+        throw new Error('Failed to fetch payment intent');
+      }
+      setPaymentIntentId(paymentIntent);
+      const {error} = await presentPaymentSheet();
+      if (error) {
+        Alert.alert(`Error code: ${error.code}`, error.message);
+      } else {
+        await handlePlaceOrder();
+      }
+    } catch (error) {
+      console.error('Error processing payment:', error);
+      Alert.alert('Error', 'Failed to process payment. Please try again.');
+    } finally {
       setProcessing(false);
     }
   };
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => {
-            if (activeStep === 'payment') {
-              setActiveStep('shipping');
-            } else {
-              navigation.back();
-            }
-          }}>
-          <ChevronLeft size={24} color={Colors.text.primary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Checkout</Text>
-        <TouchableOpacity
-          style={styles.closeButton}
-          onPress={() => navigation.back()}>
-          <X size={24} color={Colors.text.primary} />
-        </TouchableOpacity>
-      </View>
+  useEffect(() => {
+    initializePaymentSheet();
+  }, [isExpressShipping]);
 
+  return (
+    <View style={[styles.container, {paddingTop: insets.top}]}>
+      <Header title="Checkout" />
       <View style={styles.progressContainer}>
         <View
           style={[
@@ -395,6 +430,7 @@ export default function CheckoutScreen() {
             title="Continue to Payment"
             onPress={handleContinueToPayment}
             fullWidth
+            textStyle={{paddingVertical: Spacing.sm}}
           />
         ) : (
           <Button
@@ -414,33 +450,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.xxl,
-    paddingBottom: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.neutral[200],
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  closeButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontFamily: Typography.fonts.semiBold,
-    fontSize: Typography.sizes.lg,
-    color: Colors.text.primary,
   },
   progressContainer: {
     flexDirection: 'row',
@@ -567,7 +576,7 @@ const styles = StyleSheet.create({
   },
   orderSummary: {
     padding: Spacing.lg,
-    backgroundColor: Colors.neutral[50],
+    backgroundColor: Colors.ne5,
     borderTopWidth: 1,
     borderTopColor: Colors.neutral[300],
   },

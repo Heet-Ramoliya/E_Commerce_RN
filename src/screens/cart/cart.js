@@ -16,12 +16,16 @@ import Colors from '../../constants/Colors';
 import Spacing from '../../constants/Spacing';
 import Typography from '../../constants/Typography';
 import {useCart} from '../../context/CartContext';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import Header from '../../components/Header';
 
 export default function CartScreen() {
   const navigation = useNavigation();
   const {cart, loading: cartLoading, getCartTotal, clearCart} = useCart();
   const {user} = useAuth();
   const [checkingOut, setCheckingOut] = useState(false);
+
+  const insets = useSafeAreaInsets();
 
   const subtotal = getCartTotal();
   const shipping = subtotal > 0 ? (subtotal > 100 ? 0 : 10) : 0;
@@ -63,17 +67,15 @@ export default function CartScreen() {
           title="Start Shopping"
           onPress={() => navigation.navigate('/')}
           style={styles.startShoppingButton}
+          textStyle={{paddingVertical: Spacing.sm}}
         />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Shopping Cart</Text>
-        <Text style={styles.itemCount}>{cart.length} items</Text>
-      </View>
+    <View style={[styles.container, {paddingTop: insets.top}]}>
+      <Header title="Shopping Cart" />
 
       <ScrollView style={styles.itemsContainer}>
         {cart.map(item => (
@@ -112,6 +114,7 @@ export default function CartScreen() {
           title={user ? 'Proceed to Checkout' : 'Sign In to Checkout'}
           onPress={handleCheckout}
           loading={checkingOut}
+          textStyle={{paddingVertical: Spacing.sm}}
           fullWidth
         />
       </View>

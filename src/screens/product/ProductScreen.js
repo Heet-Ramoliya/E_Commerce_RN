@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, use} from 'react';
 import {
   View,
   Text,
@@ -8,24 +8,18 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Dimensions,
+  Alert,
 } from 'react-native';
-import {useLocalSearchParams, useRouter} from 'expo-router';
-import {
-  ChevronLeft,
-  Star,
-  Plus,
-  Minus,
-  Heart,
-  Share,
-  Check,
-} from 'lucide-react-native';
+import {ChevronLeft, Heart, Minus, Plus, Share} from 'lucide-react-native';
 import {useCart} from '../../context/CartContext';
-import {getProductById} from '../../data/products';
+import {doc, getDoc, onSnapshot} from '@react-native-firebase/firestore';
+import {db} from '../../config/firebase';
 import Button from '../../components/Button';
 import Colors from '../../constants/Colors';
 import Spacing from '../../constants/Spacing';
 import Typography from '../../constants/Typography';
 import {useNavigation, useRoute} from '@react-navigation/native';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 const {width} = Dimensions.get('window');
 
@@ -34,33 +28,42 @@ export default function ProductScreen() {
   const route = useRoute();
   const {id} = route.params;
   const {addToCart} = useCart();
+  const insets = useSafeAreaInsets();
 
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
-  const [selectedColor, setSelectedColor] = useState(null);
   const [adding, setAdding] = useState(false);
 
   useEffect(() => {
-    const loadProduct = async () => {
-      // Simulate network request
-      await new Promise(resolve => setTimeout(resolve, 500));
+    setLoading(true);
+    const unsubscribe = onSnapshot(
+      doc(db, 'products', id),
+      productDoc => {
+        if (productDoc.exists()) {
+          const productData = {id: productDoc.id, ...productDoc.data()};
+          setProduct(productData);
+        } else {
+          setProduct(null);
+        }
+        setLoading(false);
+      },
+      error => {
+        console.error('Error fetching product:', error);
+        setProduct(null);
+        setLoading(false);
+      },
+    );
 
-      const productData = getProductById(id);
-      setProduct(productData);
-
-      if (productData && productData.colors && productData.colors.length > 0) {
-        setSelectedColor(productData.colors[0]);
-      }
-
-      setLoading(false);
-    };
-
-    loadProduct();
+    return () => unsubscribe();
   }, [id]);
 
   const handleIncrement = () => {
-    setQuantity(prev => prev + 1);
+    if (product && quantity < product.stock) {
+      setQuantity(prev => prev + 1);
+    } else if (product && quantity >= product.stock) {
+      Alert.alert('Stock Limit', `Only ${product.stock} items available.`);
+    }
   };
 
   const handleDecrement = () => {
@@ -70,13 +73,24 @@ export default function ProductScreen() {
   };
 
   const handleAddToCart = async () => {
+    if (product.stock <= 0) {
+      Alert.alert('Out of Stock', 'This product is currently unavailable.');
+      return;
+    }
+    if (quantity > product.stock) {
+      Alert.alert('Stock Limit', `Only ${product.stock} items available.`);
+      return;
+    }
+
     setAdding(true);
-
-    // Simulate network request
-    await new Promise(resolve => setTimeout(resolve, 800));
-
-    addToCart(product, quantity);
-    setAdding(false);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 800));
+      addToCart(product, quantity);
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+    } finally {
+      setAdding(false);
+    }
   };
 
   if (loading) {
@@ -101,12 +115,14 @@ export default function ProductScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, {paddingTop: insets.top}]}>
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header/Image Section */}
         <View style={styles.imageContainer}>
           <Image
-            source={{uri: product.image}}
+            source={{
+              uri: product.imageUrls?.[0] || 'https://via.placeholder.com/300',
+            }}
             style={styles.image}
             resizeMode="cover"
           />
@@ -133,41 +149,8 @@ export default function ProductScreen() {
           <View style={styles.titleSection}>
             <Text style={styles.category}>{product.category}</Text>
             <Text style={styles.title}>{product.name}</Text>
-
-            <View style={styles.ratingContainer}>
-              <Star
-                size={16}
-                color={Colors.warning[500]}
-                fill={Colors.warning[500]}
-              />
-              <Text style={styles.rating}>{product.rating}</Text>
-              <Text style={styles.reviewCount}>
-                ({product.reviewCount} reviews)
-              </Text>
-            </View>
-
             <Text style={styles.price}>${product.price.toFixed(2)}</Text>
           </View>
-
-          {/* Color Selection */}
-          {product.colors && product.colors.length > 0 && (
-            <View style={styles.selectorSection}>
-              <Text style={styles.selectorTitle}>Color</Text>
-              <View style={styles.colorOptions}>
-                {product.colors.map(color => (
-                  <TouchableOpacity
-                    key={color}
-                    style={[
-                      styles.colorOption,
-                      selectedColor === color && styles.selectedColorOption,
-                    ]}
-                    onPress={() => setSelectedColor(color)}>
-                    <Text style={styles.colorText}>{color}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          )}
 
           {/* Quantity Selection */}
           <View style={styles.selectorSection}>
@@ -177,33 +160,32 @@ export default function ProductScreen() {
                 style={styles.quantityButton}
                 onPress={handleDecrement}
                 disabled={quantity <= 1}>
-                <Minus size={16} color={Colors.text.primary} />
+                <Minus
+                  size={16}
+                  color={
+                    quantity <= 1 ? Colors.neutral[400] : Colors.text.primary
+                  }
+                />
               </TouchableOpacity>
 
               <Text style={styles.quantity}>{quantity}</Text>
 
               <TouchableOpacity
                 style={styles.quantityButton}
-                onPress={handleIncrement}>
-                <Plus size={16} color={Colors.text.primary} />
+                onPress={handleIncrement}
+                disabled={product.stock <= 0}>
+                <Plus
+                  size={16}
+                  color={
+                    product.stock <= 0
+                      ? Colors.neutral[400]
+                      : Colors.text.primary
+                  }
+                />
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* Product Features */}
-          <View style={styles.featuresSection}>
-            <Text style={styles.featuresTitle}>Features</Text>
-            <View style={styles.featuresList}>
-              {product.features.map((feature, index) => (
-                <View key={index} style={styles.featureItem}>
-                  <Check size={16} color={Colors.success[500]} />
-                  <Text style={styles.featureText}>{feature}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-
-          {/* Description */}
           <View style={styles.descriptionSection}>
             <Text style={styles.descriptionTitle}>Description</Text>
             <Text style={styles.description}>{product.description}</Text>
@@ -218,6 +200,8 @@ export default function ProductScreen() {
           onPress={handleAddToCart}
           loading={adding}
           fullWidth
+          disabled={product.stock <= 0}
+          textStyle={{paddingVertical: Spacing.sm}}
         />
       </View>
     </View>
@@ -311,27 +295,16 @@ const styles = StyleSheet.create({
     color: Colors.text.primary,
     marginBottom: Spacing.sm,
   },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: Spacing.md,
-  },
-  rating: {
-    fontFamily: Typography.fonts.medium,
-    fontSize: Typography.sizes.sm,
-    color: Colors.text.secondary,
-    marginLeft: Spacing.xs,
-  },
-  reviewCount: {
-    fontFamily: Typography.fonts.regular,
-    fontSize: Typography.sizes.sm,
-    color: Colors.text.tertiary,
-    marginLeft: Spacing.xs,
-  },
   price: {
     fontFamily: Typography.fonts.semiBold,
     fontSize: Typography.sizes.xl,
     color: Colors.primary[600],
+    marginBottom: Spacing.xs,
+  },
+  stock: {
+    fontFamily: Typography.fonts.regular,
+    fontSize: Typography.sizes.sm,
+    color: Colors.text.secondary,
   },
   selectorSection: {
     marginBottom: Spacing.lg,
@@ -341,26 +314,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.md,
     color: Colors.text.primary,
     marginBottom: Spacing.sm,
-  },
-  colorOptions: {
-    flexDirection: 'row',
-  },
-  colorOption: {
-    borderWidth: 1,
-    borderColor: Colors.neutral[300],
-    borderRadius: Spacing.radius.sm,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    marginRight: Spacing.sm,
-  },
-  selectedColorOption: {
-    borderColor: Colors.primary[600],
-    backgroundColor: Colors.primary[50],
-  },
-  colorText: {
-    fontFamily: Typography.fonts.medium,
-    fontSize: Typography.sizes.sm,
-    color: Colors.text.secondary,
   },
   quantitySelector: {
     flexDirection: 'row',
@@ -383,30 +336,6 @@ const styles = StyleSheet.create({
     color: Colors.text.primary,
     minWidth: 40,
     textAlign: 'center',
-  },
-  featuresSection: {
-    marginBottom: Spacing.lg,
-  },
-  featuresTitle: {
-    fontFamily: Typography.fonts.medium,
-    fontSize: Typography.sizes.md,
-    color: Colors.text.primary,
-    marginBottom: Spacing.sm,
-  },
-  featuresList: {
-    marginTop: Spacing.xs,
-  },
-  featureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
-  },
-  featureText: {
-    fontFamily: Typography.fonts.regular,
-    fontSize: Typography.sizes.md,
-    color: Colors.text.secondary,
-    marginLeft: Spacing.sm,
-    flex: 1,
   },
   descriptionSection: {
     marginBottom: Spacing.xl,

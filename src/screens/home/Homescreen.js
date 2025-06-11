@@ -15,13 +15,11 @@ import Typography from '../../constants/Typography';
 import Colors from '../../constants/Colors';
 import Spacing from '../../constants/Spacing';
 import {useAuth} from '../../context/AuthContext';
-import {
-  getCategories,
-  getFeaturedProducts,
-  getNewProducts,
-} from '../../data/products';
 import CategoryCard from '../../components/CategoryCard';
 import {SearchIcon} from 'lucide-react-native';
+import {db} from '../../config/firebase';
+import {collection, onSnapshot} from '@react-native-firebase/firestore';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 const {width} = Dimensions.get('window');
 
@@ -29,23 +27,44 @@ const Homescreen = () => {
   const navigation = useNavigation();
   const {user} = useAuth();
   const [loading, setLoading] = useState(true);
-  const [featuredProducts, setFeaturedProducts] = useState([]);
-  const [newProducts, setNewProducts] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [products, setProducts] = useState([]);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
-    const loadData = async () => {
-      // Simulate network request
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      setFeaturedProducts(getFeaturedProducts());
-      setNewProducts(getNewProducts());
-      setCategories(getCategories());
-      setLoading(false);
-    };
-
-    loadData();
+    const unsubscribe = onSnapshot(
+      collection(db, 'products'),
+      snapshot => {
+        const productsData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setProducts(productsData);
+        const categoriesData = productsData.map(product => ({
+          id: product.id,
+          name: product.category,
+        }));
+        const uniqueCategories = Array.from(
+          new Set(categoriesData.map(cat => cat.name)),
+        ).map(name => categoriesData.find(cat => cat.name === name));
+        setCategories(uniqueCategories);
+        setLoading(false);
+      },
+      error => {
+        console.error('Error fetching products:', error);
+        setLoading(false);
+      },
+    );
+    return () => unsubscribe();
   }, []);
+
+  const handleCategoryPress = category => {
+    console.log('Navigating to Search with category:', category);
+    navigation.navigate('BottomTab', {
+      screen: 'Search',
+      params: {category},
+    });
+  };
 
   if (loading) {
     return (
@@ -57,7 +76,7 @@ const Homescreen = () => {
 
   return (
     <ScrollView
-      style={styles.container}
+      style={[styles.container, {paddingTop: insets.top}]}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.contentContainer}>
       {/* Hero Section */}
@@ -97,7 +116,11 @@ const Homescreen = () => {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.categoriesContainer}>
           {categories.map(category => (
-            <CategoryCard key={category} category={category} />
+            <CategoryCard
+              key={category.id}
+              category={category.name}
+              onPress={() => handleCategoryPress(category.name)}
+            />
           ))}
         </ScrollView>
       </View>
@@ -108,11 +131,11 @@ const Homescreen = () => {
           title="Featured Products"
           actionText="See All"
           onActionPress={() =>
-            navigation.navigate('BottomTab', {screen: 'Search?featured=true'})
+            navigation.navigate('BottomTab', {screen: 'Search'})
           }
         />
         <FlatList
-          data={featuredProducts}
+          data={products}
           keyExtractor={item => item.id}
           renderItem={({item}) => <ProductCard product={item} />}
           horizontal
@@ -123,24 +146,6 @@ const Homescreen = () => {
           decelerationRate="fast"
           style={styles.productList}
         />
-      </View>
-
-      {/* New Arrivals Section */}
-      <View style={styles.section}>
-        <SectionHeader
-          title="New Arrivals"
-          actionText="See All"
-          onActionPress={() =>
-            navigation.navigate('BottomTab', {screen: 'Search?featured=true'})
-          }
-        />
-        <View style={styles.productGrid}>
-          {newProducts.map(product => (
-            <View style={styles.productCardContainer} key={product.id}>
-              <ProductCard product={product} />
-            </View>
-          ))}
-        </View>
       </View>
     </ScrollView>
   );
@@ -217,16 +222,6 @@ const styles = StyleSheet.create({
   },
   productList: {
     marginTop: Spacing.md,
-  },
-  productGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginHorizontal: -Spacing.sm / 2,
-    marginTop: Spacing.md,
-  },
-  productCardContainer: {
-    width: '50%',
-    paddingHorizontal: Spacing.sm / 2,
   },
 });
 

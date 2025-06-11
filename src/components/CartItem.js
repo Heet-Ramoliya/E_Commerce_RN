@@ -29,7 +29,7 @@ const CartItem = ({item}) => {
 
   return (
     <View style={styles.container}>
-      <Image source={{uri: item.image}} style={styles.image} />
+      <Image source={{uri: item.imageUrls[0]}} style={styles.image} />
 
       <View style={styles.contentContainer}>
         <Text style={styles.name} numberOfLines={2}>

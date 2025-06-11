@@ -22,10 +22,13 @@ import Colors from '../../constants/Colors';
 import Spacing from '../../constants/Spacing';
 import Typography from '../../constants/Typography';
 import {useAuth} from '../../context/AuthContext';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 export default function ProfileScreen() {
   const navigation = useNavigation();
   const {user, logout, loading: authLoading} = useAuth();
+
+  const insets = useSafeAreaInsets();
 
   const handleLogout = async () => {
     await logout();
@@ -51,7 +54,7 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView
-      style={styles.container}
+      style={[styles.container, {paddingTop: insets.top}]}
       contentContainerStyle={styles.contentContainer}>
       <View style={styles.profileHeader}>
         <View style={styles.profileImageContainer}>
@@ -81,7 +84,9 @@ export default function ProfileScreen() {
           <ChevronRight size={18} color={Colors.neutral[400]} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.menuItem}>
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => navigation.navigate('orders')}>
           <View style={styles.menuIconContainer}>
             <Package size={20} color={Colors.primary[600]} />
           </View>

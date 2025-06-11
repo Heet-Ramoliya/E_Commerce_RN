@@ -3,19 +3,12 @@ import {TouchableOpacity, Text, StyleSheet} from 'react-native';
 import Spacing from '../constants/Spacing';
 import Colors from '../constants/Colors';
 import Typography from '../constants/Typography';
-import {useNavigation} from '@react-navigation/native';
 
-const CategoryCard = ({category, isSelected = false}) => {
-  const navigation = useNavigation();
-
-  const handlePress = () => {
-    navigation.navigate(`search?category=${category}`);
-  };
-
+const CategoryCard = ({category, isSelected = false, onPress}) => {
   return (
     <TouchableOpacity
       style={[styles.card, isSelected && styles.selectedCard]}
-      onPress={handlePress}>
+      onPress={onPress}>
       <Text style={[styles.text, isSelected && styles.selectedText]}>
         {category}
       </Text>
