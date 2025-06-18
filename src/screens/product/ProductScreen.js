@@ -124,7 +124,7 @@ export default function ProductScreen() {
               uri: product.imageUrls?.[0] || 'https://via.placeholder.com/300',
             }}
             style={styles.image}
-            resizeMode="cover"
+            resizeMode="contain"
           />
 
           <TouchableOpacity

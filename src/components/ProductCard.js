@@ -17,7 +17,7 @@ const FALLBACK_IMAGE = 'https://via.placeholder.com/150';
 
 const ProductCard = ({product}) => {
   const navigation = useNavigation();
-  const {addToCart} = useCart();
+  const {addToCart, cart, updateQuantity} = useCart();
 
   const handlePress = () => {
     navigation.navigate('Product', {id: product.id});
@@ -27,9 +27,19 @@ const ProductCard = ({product}) => {
     addToCart(product);
   };
 
+  const handleDecreaseQuantity = () => {
+    const cartItem = cart.find(item => item.id === product.id);
+    if (cartItem) {
+      updateQuantity(product.id, cartItem.quantity - 1);
+    }
+  };
+
   const imageUri = Array.isArray(product.imageUrls)
     ? product.imageUrls[0]
     : product.imageUrls || FALLBACK_IMAGE;
+
+  const cartItem = cart.find(item => item.id === product.id);
+  const quantity = cartItem ? cartItem.quantity : 0;
 
   return (
     <TouchableOpacity
@@ -54,9 +64,23 @@ const ProductCard = ({product}) => {
           <Text style={styles.price}>
             ${product.price ? product.price.toFixed(2) : '0.00'}
           </Text>
-          <TouchableOpacity style={styles.addButton} onPress={handleAddToCart}>
-            <Text style={styles.addButtonText}>Add</Text>
-          </TouchableOpacity>
+          <View style={styles.quantityControls}>
+            {quantity > 0 && (
+              <TouchableOpacity
+                style={styles.quantityButton}
+                onPress={handleDecreaseQuantity}>
+                <Text style={styles.quantityButtonText}>-</Text>
+              </TouchableOpacity>
+            )}
+            {quantity > 0 && (
+              <Text style={styles.quantityText}>{quantity}</Text>
+            )}
+            <TouchableOpacity
+              style={styles.quantityButton}
+              onPress={handleAddToCart}>
+              <Text style={styles.quantityButtonText}>+</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </TouchableOpacity>
@@ -70,14 +94,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginBottom: Spacing.md,
     ...Platform.select({
-      web: {
-        width: '100%',
-        transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-        ':hover': {
-          transform: 'translateY(-4px)',
-          boxShadow: '0 10px 20px rgba(0, 0, 0, 0.1)',
-        },
-      },
       default: {
         elevation: 3,
         shadowColor: Colors.neutral[900],
@@ -92,7 +108,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   image: {
-    width: '230',
+    width: '200',
     height: '100%',
     resizeMode: 'contain',
   },
@@ -136,16 +152,27 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fonts.semiBold,
     color: Colors.primary[600],
   },
-  addButton: {
+  quantityControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  quantityButton: {
     backgroundColor: Colors.primary[50],
     paddingVertical: Spacing.xs,
     paddingHorizontal: Spacing.sm,
     borderRadius: Spacing.radius.sm,
+    marginHorizontal: Spacing.xs,
   },
-  addButtonText: {
+  quantityButtonText: {
     color: Colors.primary[600],
     fontSize: Typography.sizes.sm,
     fontFamily: Typography.fonts.medium,
+  },
+  quantityText: {
+    color: Colors.text.primary,
+    fontSize: Typography.sizes.sm,
+    fontFamily: Typography.fonts.medium,
+    marginHorizontal: Spacing.xs,
   },
 });
 

@@ -9,13 +9,19 @@ import {
   Alert,
   TouchableOpacity,
 } from 'react-native';
-import {doc, getDoc, updateDoc} from '@react-native-firebase/firestore';
+import {
+  doc,
+  getDoc,
+  onSnapshot,
+  updateDoc,
+} from '@react-native-firebase/firestore';
 import {db} from '../../config/firebase';
 import Typography from '../../constants/Typography';
 import Colors from '../../constants/Colors';
 import Spacing from '../../constants/Spacing';
 import Header from '../../components/Header';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {useNavigation} from '@react-navigation/native';
 
 const OrderDetails = ({route}) => {
   const {orderId} = route.params;
@@ -23,10 +29,12 @@ const OrderDetails = ({route}) => {
   const [loading, setLoading] = useState(true);
   const insets = useSafeAreaInsets();
 
+  const navigation = useNavigation();
+
   useEffect(() => {
-    const fetchOrder = async () => {
-      try {
-        const orderDoc = await getDoc(doc(db, 'orders', orderId));
+    const unsubscribe = onSnapshot(
+      doc(db, 'orders', orderId),
+      orderDoc => {
         if (orderDoc.exists()) {
           const data = orderDoc.data();
           setOrder({
@@ -41,14 +49,16 @@ const OrderDetails = ({route}) => {
         } else {
           Alert.alert('Error', 'Order not found.');
         }
-      } catch (error) {
+        setLoading(false);
+      },
+      error => {
         console.error('Error fetching order:', error);
         Alert.alert('Error', 'Failed to load order details.');
-      } finally {
         setLoading(false);
-      }
-    };
-    fetchOrder();
+      },
+    );
+
+    return () => unsubscribe();
   }, [orderId]);
 
   const handleCancelOrder = async () => {

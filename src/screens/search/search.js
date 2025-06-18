@@ -23,131 +23,182 @@ import {
 } from '@react-native-firebase/firestore';
 import {db} from '../../config/firebase';
 import {useNavigation, useRoute} from '@react-navigation/native';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 export default function SearchScreen() {
   const navigation = useNavigation();
   const route = useRoute();
-  const {category} = route.params || {};
+  const {category: initialCategory} = route.params || {};
+  const insets = useSafeAreaInsets();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState(
-    category ? category.toLowerCase() : null,
-  );
+  const [mainCategories, setMainCategories] = useState([]);
+  const [selectedCategoryPath, setSelectedCategoryPath] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  console.log('Route category:', category);
-  console.log('Selected category:', selectedCategory);
+  console.log('selectedCategoryPath ======> ', selectedCategoryPath);
 
   useEffect(() => {
-    // Fetch categories
-    const unsubscribeCategories = onSnapshot(
-      collection(db, 'products'),
+    const unsubscribe = onSnapshot(
+      collection(db, 'categories'),
       snapshot => {
         const categoriesData = snapshot.docs.map(doc => ({
           id: doc.id,
-          name: doc.data().category,
+          ...doc.data(),
         }));
-        const uniqueCategories = Array.from(
-          new Set(categoriesData.map(cat => cat.name)),
-        ).map(name => categoriesData.find(cat => cat.name === name));
-        setCategories(uniqueCategories);
-        // Validate route category
-        if (category && !selectedCategory) {
-          const matchedCategory = uniqueCategories.find(
-            cat => cat.name.toLowerCase() === category.toLowerCase(),
+        setCategories(categoriesData);
+        const mainCategories = categoriesData.filter(
+          category => category.parentId === null,
+        );
+        setMainCategories(mainCategories);
+        if (initialCategory && selectedCategoryPath.length === 0) {
+          const matchingCategory = categoriesData.find(
+            cat => cat.name === initialCategory,
           );
-          if (matchedCategory) {
-            setSelectedCategory(matchedCategory.name.toLowerCase());
+          if (matchingCategory) {
+            setSelectedCategoryPath([matchingCategory]);
           }
         }
         setLoading(false);
       },
       error => {
-        console.error('Error fetching categories:', error);
+        console.error(error);
         setLoading(false);
       },
     );
-
-    return () => unsubscribeCategories();
-  }, [category]);
+    return () => unsubscribe();
+  }, [initialCategory]);
 
   useEffect(() => {
-    // Fetch products based on searchQuery or selectedCategory
-    let unsubscribeProducts;
-
-    console.log(
-      'Fetching products for searchQuery:',
-      searchQuery,
-      'selectedCategory:',
-      selectedCategory,
-    );
-
-    if (searchQuery.trim()) {
-      // Search products by name (case-insensitive)
-      const q = query(
-        collection(db, 'products'),
-        where('name', '>=', searchQuery),
-        where('name', '<=', searchQuery + '\uf8ff'),
-      );
-      unsubscribeProducts = onSnapshot(
-        q,
-        snapshot => {
-          const productsData = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-          }));
-          console.log('Search results:', productsData);
-          setSearchResults(productsData);
-        },
-        error => {
-          console.error('Error searching products:', error);
-          setSearchResults([]);
-        },
-      );
-    } else if (selectedCategory) {
-      // Filter products by category
-      const q = query(
-        collection(db, 'products'),
-        where('category', '==', selectedCategory),
-      );
-      unsubscribeProducts = onSnapshot(
-        q,
-        snapshot => {
-          const productsData = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-          }));
-          console.log('Category products:', productsData);
-          setSearchResults(productsData);
-        },
-        error => {
-          console.error('Error fetching products by category:', error);
-          setSearchResults([]);
-        },
-      );
+    let q;
+    if (selectedCategoryPath.length === 0) {
+      q = collection(db, 'products');
     } else {
-      setSearchResults([]);
+      const lastCategory =
+        selectedCategoryPath[selectedCategoryPath.length - 1];
+      q = query(
+        collection(db, 'products'),
+        where('category', '==', lastCategory.name),
+      );
     }
 
-    return () => {
-      if (unsubscribeProducts) unsubscribeProducts();
-    };
-  }, [searchQuery, selectedCategory]);
+    const unsubscribe = onSnapshot(
+      q,
+      snapshot => {
+        const productsData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setSearchResults(productsData);
+        setLoading(false);
+      },
+      error => {
+        console.error(error);
+        setLoading(false);
+      },
+    );
+    return () => unsubscribe();
+  }, [selectedCategoryPath]);
 
+  // Handle search query
   const handleSearch = query => {
     setSearchQuery(query);
+    if (query.trim()) {
+      // Search products by name
+      const q = collection(db, 'products');
+      const unsubscribe = onSnapshot(
+        q,
+        snapshot => {
+          const productsData = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
+          const filteredProducts = productsData.filter(product =>
+            product.name.toLowerCase().includes(query.toLowerCase()),
+          );
+          setSearchResults(filteredProducts);
+        },
+        error => console.error(error),
+      );
+      return () => unsubscribe();
+    } else {
+      let q;
+      if (selectedCategoryPath.length === 0) {
+        q = collection(db, 'products');
+      } else {
+        const lastCategory =
+          selectedCategoryPath[selectedCategoryPath.length - 1];
+        q = query(
+          collection(db, 'products'),
+          where('category', '==', lastCategory.name),
+        );
+      }
+      onSnapshot(q, snapshot => {
+        const productsData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setSearchResults(productsData);
+      });
+    }
   };
 
-  const handleCategorySelect = categoryName => {
-    console.log('Selecting category:', categoryName);
-    setSelectedCategory(categoryName);
+  const getSubCategories = parentId => {
+    return categories.filter(category => category.parentId === parentId);
+  };
+
+  const handleCategorySelect = category => {
+    console.log('Selecting category:', category);
+    if (category.parentId === null) {
+      setSelectedCategoryPath([category]);
+    } else {
+      const existingIndex = selectedCategoryPath.findIndex(
+        cat => cat.id === category.id,
+      );
+      if (existingIndex !== -1) {
+        setSelectedCategoryPath(
+          selectedCategoryPath.slice(0, existingIndex + 1),
+        );
+      } else {
+        const parentIndex = selectedCategoryPath.findIndex(
+          cat => cat.id === category.parentId,
+        );
+        if (parentIndex !== -1) {
+          setSelectedCategoryPath([
+            ...selectedCategoryPath.slice(0, parentIndex + 1),
+            category,
+          ]);
+        } else {
+          setSelectedCategoryPath([...selectedCategoryPath, category]);
+        }
+      }
+    }
     setSearchQuery('');
   };
 
   const clearSearch = () => {
     setSearchQuery('');
+
+    let q;
+    if (selectedCategoryPath.length === 0) {
+      q = collection(db, 'products');
+    } else {
+      const lastCategory =
+        selectedCategoryPath[selectedCategoryPath.length - 1];
+      q = query(
+        collection(db, 'products'),
+        where('category', '==', lastCategory.name),
+      );
+    }
+    onSnapshot(q, snapshot => {
+      const productsData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setSearchResults(productsData);
+    });
   };
 
   const renderEmptyState = () => {
@@ -170,23 +221,16 @@ export default function SearchScreen() {
       );
     }
 
-    if (selectedCategory && searchResults.length === 0) {
+    if (searchResults.length === 0) {
       return (
         <View style={styles.emptyStateContainer}>
           <Text style={styles.emptyStateTitle}>No products found</Text>
           <Text style={styles.emptyStateText}>
-            No products available in the "{selectedCategory}" category
-          </Text>
-        </View>
-      );
-    }
-
-    if (!selectedCategory && !searchQuery.trim()) {
-      return (
-        <View style={styles.emptyStateContainer}>
-          <Text style={styles.emptyStateTitle}>Find products</Text>
-          <Text style={styles.emptyStateText}>
-            Search for products or select a category to start browsing
+            {selectedCategoryPath.length > 0
+              ? `No products available in the "${
+                  selectedCategoryPath[selectedCategoryPath.length - 1].name
+                }" category`
+              : 'No products available'}
           </Text>
         </View>
       );
@@ -201,10 +245,48 @@ export default function SearchScreen() {
     </View>
   );
 
+  const renderCategoryLevel = (categories, level) => {
+    if (categories.length === 0) return null;
+    return (
+      <View style={styles.categoriesContainer}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoriesScrollContainer}>
+          {categories.map(category => (
+            <CategoryCard
+              key={category.id}
+              category={category.name}
+              isSelected={selectedCategoryPath.some(
+                cat => cat.id === category.id,
+              )}
+              onPress={() => handleCategorySelect(category)}
+            />
+          ))}
+        </ScrollView>
+      </View>
+    );
+  };
+
+  const renderCategoryHierarchy = () => {
+    const levels = [];
+    levels.push(renderCategoryLevel(mainCategories, 0));
+    selectedCategoryPath.forEach((selectedCategory, index) => {
+      const subCategories = getSubCategories(selectedCategory.id);
+      levels.push(renderCategoryLevel(subCategories, index + 1));
+    });
+    return levels;
+  };
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, {paddingTop: insets.top}]}>
       <View style={styles.header}>
         <Text style={styles.title}>Discover Products</Text>
+        {selectedCategoryPath.length > 0 && (
+          <Text style={styles.breadcrumb}>
+            {selectedCategoryPath.map(cat => cat.name).join(' > ')}
+          </Text>
+        )}
       </View>
 
       <View style={styles.searchContainer}>
@@ -224,21 +306,7 @@ export default function SearchScreen() {
         )}
       </View>
 
-      <View style={styles.categoriesContainer}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoriesScrollContainer}>
-          {categories.map(category => (
-            <CategoryCard
-              key={category.id}
-              category={category.name}
-              isSelected={selectedCategory === category.name}
-              onPress={() => handleCategorySelect(category.name)}
-            />
-          ))}
-        </ScrollView>
-      </View>
+      {renderCategoryHierarchy()}
 
       {searchResults.length > 0 ? (
         <FlatList
@@ -272,6 +340,12 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.xxl,
     color: Colors.text.primary,
   },
+  breadcrumb: {
+    fontFamily: Typography.fonts.regular,
+    fontSize: Typography.sizes.sm,
+    color: Colors.text.secondary,
+    marginTop: Spacing.xs,
+  },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -304,6 +378,7 @@ const styles = StyleSheet.create({
   },
   productCardContainer: {
     marginBottom: Spacing.md,
+    paddingEnd: Spacing.md,
   },
   emptyStateContainer: {
     flex: 1,

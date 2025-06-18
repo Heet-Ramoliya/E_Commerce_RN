@@ -103,7 +103,7 @@ const Homescreen = () => {
       </View>
 
       {/* Categories Section */}
-      <View style={styles.categoriesSection}>
+      {/* <View style={styles.categoriesSection}>
         <SectionHeader
           title="Categories"
           actionText="See All"
@@ -123,7 +123,7 @@ const Homescreen = () => {
             />
           ))}
         </ScrollView>
-      </View>
+      </View> */}
 
       {/* Featured Products Section */}
       <View style={styles.section}>

@@ -439,6 +439,7 @@ export default function CheckoutScreen() {
             loading={processing}
             fullWidth
             disabled={processing}
+            textStyle={{paddingVertical: Spacing.sm}}
           />
         )}
       </View>
