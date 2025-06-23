@@ -1,40 +1,92 @@
 import React from 'react';
-import {TouchableOpacity, Text, StyleSheet} from 'react-native';
+import {TouchableOpacity, Text, StyleSheet, Animated, View} from 'react-native';
 import Spacing from '../constants/Spacing';
 import Colors from '../constants/Colors';
 import Typography from '../constants/Typography';
 
 const CategoryCard = ({category, isSelected = false, onPress}) => {
+  const scaleValue = new Animated.Value(1);
+
+  const handlePressIn = () => {
+    Animated.spring(scaleValue, {
+      toValue: 0.98,
+      friction: 6,
+      tension: 80,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleValue, {
+      toValue: 1,
+      friction: 6,
+      tension: 80,
+      useNativeDriver: true,
+    }).start();
+  };
+
   return (
     <TouchableOpacity
-      style={[styles.card, isSelected && styles.selectedCard]}
+      activeOpacity={1}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
       onPress={onPress}>
-      <Text style={[styles.text, isSelected && styles.selectedText]}>
-        {category}
-      </Text>
+      <Animated.View
+        style={[
+          styles.card,
+          isSelected && styles.selectedCard,
+          {
+            transform: [{scale: scaleValue}],
+          },
+        ]}>
+        <Text style={[styles.text, isSelected && styles.selectedText]}>
+          {category}
+        </Text>
+        {isSelected && <View style={styles.selectedIndicator} />}
+      </Animated.View>
     </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
+    marginRight: Spacing.md,
     paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    backgroundColor: Colors.neutral[100],
-    borderRadius: Spacing.radius.full,
-    marginRight: Spacing.sm,
-    marginBottom: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: Spacing.radius.md,
+    backgroundColor: Colors.neutral[50],
+    shadowColor: Colors.neutral[900],
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 2,
   },
   selectedCard: {
-    backgroundColor: Colors.primary[600],
+    backgroundColor: Colors.primary[50],
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
   },
   text: {
     fontFamily: Typography.fonts.medium,
-    fontSize: Typography.sizes.sm,
+    fontSize: Typography.sizes.md,
     color: Colors.text.secondary,
+    textAlign: 'center',
   },
   selectedText: {
-    color: Colors.text.inverse,
+    color: Colors.primary[700],
+    fontFamily: Typography.fonts.bold,
+  },
+  selectedIndicator: {
+    position: 'absolute',
+    bottom: -2,
+    left: '50%',
+    width: 24,
+    height: 3,
+    backgroundColor: Colors.primary[600],
+    borderRadius: 2,
+    transform: [{translateX: -12}],
   },
 });
 

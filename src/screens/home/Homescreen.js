@@ -108,7 +108,7 @@ const Homescreen = () => {
           title="Categories"
           actionText="See All"
           onActionPress={() =>
-            navigation.navigate('BottomTab', {screen: 'Search'})
+            navigation.navigate('BottomTab', { screen: 'Search' })
           }
         />
         <ScrollView
@@ -138,13 +138,11 @@ const Homescreen = () => {
           data={products}
           keyExtractor={item => item.id}
           renderItem={({item}) => <ProductCard product={item} />}
-          horizontal
-          showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.productListContainer}
-          ItemSeparatorComponent={() => <View style={{width: Spacing.md}} />}
-          snapToInterval={width * 0.65 + Spacing.md}
-          decelerationRate="fast"
+          ItemSeparatorComponent={() => <View style={{height: Spacing.sm}} />}
           style={styles.productList}
+          numColumns={2}
+          columnWrapperStyle={styles.columnWrapper}
         />
       </View>
     </ScrollView>
@@ -215,13 +213,16 @@ const styles = StyleSheet.create({
   },
   section: {
     marginTop: Spacing.xl,
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.padding['sm'],
   },
   productListContainer: {
-    paddingRight: Spacing.lg,
+    paddingBottom: Spacing.md,
   },
   productList: {
     marginTop: Spacing.md,
+  },
+  columnWrapper: {
+    justifyContent: 'space-around',
   },
 });
 

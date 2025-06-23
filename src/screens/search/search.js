@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   ScrollView,
+  Animated,
 } from 'react-native';
 import {Search as SearchIcon, X} from 'lucide-react-native';
 import Colors from '../../constants/Colors';
@@ -35,10 +36,18 @@ export default function SearchScreen() {
   const [searchResults, setSearchResults] = useState([]);
   const [categories, setCategories] = useState([]);
   const [mainCategories, setMainCategories] = useState([]);
-  const [selectedCategoryPath, setSelectedCategoryPath] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [categoryPath, setCategoryPath] = useState([]);
   const [loading, setLoading] = useState(true);
+  const fadeAnim = useState(new Animated.Value(0))[0];
 
-  console.log('selectedCategoryPath ======> ', selectedCategoryPath);
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, [selectedCategory]);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(
@@ -53,12 +62,13 @@ export default function SearchScreen() {
           category => category.parentId === null,
         );
         setMainCategories(mainCategories);
-        if (initialCategory && selectedCategoryPath.length === 0) {
+        if (initialCategory && !selectedCategory) {
           const matchingCategory = categoriesData.find(
             cat => cat.name === initialCategory,
           );
           if (matchingCategory) {
-            setSelectedCategoryPath([matchingCategory]);
+            setSelectedCategory(matchingCategory);
+            setCategoryPath([matchingCategory]);
           }
         }
         setLoading(false);
@@ -71,43 +81,41 @@ export default function SearchScreen() {
     return () => unsubscribe();
   }, [initialCategory]);
 
-  useEffect(() => {
-    let q;
-    if (selectedCategoryPath.length === 0) {
-      q = collection(db, 'products');
-    } else {
-      const lastCategory =
-        selectedCategoryPath[selectedCategoryPath.length - 1];
-      q = query(
-        collection(db, 'products'),
-        where('category', '==', lastCategory.name),
-      );
+  const getAllSubCategoryNames = categoryId => {
+    const category = categories.find(cat => cat.id === categoryId);
+    if (!category) return [];
+    const subCategories = categories.filter(cat => cat.parentId === categoryId);
+    const subCategoryNames = subCategories.flatMap(subCat => [
+      subCat.name,
+      ...getAllSubCategoryNames(subCat.id),
+    ]);
+    return [category.name, ...subCategoryNames];
+  };
+
+  const chunkArray = (array, size) => {
+    const result = [];
+    for (let i = 0; i < array.length; i += size) {
+      result.push(array.slice(i, i + size));
+    }
+    return result;
+  };
+
+  const fetchProductsForCategories = (categoryNames, callback) => {
+    if (categoryNames.length === 0) {
+      callback([]);
+      return;
     }
 
-    const unsubscribe = onSnapshot(
-      q,
-      snapshot => {
-        const productsData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setSearchResults(productsData);
-        setLoading(false);
-      },
-      error => {
-        console.error(error);
-        setLoading(false);
-      },
-    );
-    return () => unsubscribe();
-  }, [selectedCategoryPath]);
+    const chunks = chunkArray(categoryNames, 30);
+    const unsubscribeFuncs = [];
+    let combinedProducts = [];
+    let completedQueries = 0;
 
-  // Handle search query
-  const handleSearch = query => {
-    setSearchQuery(query);
-    if (query.trim()) {
-      // Search products by name
-      const q = collection(db, 'products');
+    chunks.forEach(chunk => {
+      const q = query(
+        collection(db, 'products'),
+        where('category', 'in', chunk),
+      );
       const unsubscribe = onSnapshot(
         q,
         snapshot => {
@@ -115,34 +123,68 @@ export default function SearchScreen() {
             id: doc.id,
             ...doc.data(),
           }));
-          const filteredProducts = productsData.filter(product =>
-            product.name.toLowerCase().includes(query.toLowerCase()),
-          );
-          setSearchResults(filteredProducts);
+          combinedProducts = [
+            ...combinedProducts.filter(
+              p1 => !productsData.some(p2 => p2.id === p1.id),
+            ),
+            ...productsData,
+          ];
+          completedQueries++;
+          if (completedQueries === chunks.length) {
+            callback(combinedProducts);
+          }
         },
-        error => console.error(error),
+        error => {
+          console.error(error);
+          completedQueries++;
+          if (completedQueries === chunks.length) {
+            callback(combinedProducts);
+          }
+        },
       );
-      return () => unsubscribe();
+      unsubscribeFuncs.push(unsubscribe);
+    });
+
+    return () => unsubscribeFuncs.forEach(unsubscribe => unsubscribe());
+  };
+
+  useEffect(() => {
+    let categoryNames;
+    if (!selectedCategory) {
+      const mainCategoryIds = mainCategories.map(cat => cat.id);
+      categoryNames = mainCategoryIds.flatMap(id => getAllSubCategoryNames(id));
     } else {
-      let q;
-      if (selectedCategoryPath.length === 0) {
-        q = collection(db, 'products');
-      } else {
-        const lastCategory =
-          selectedCategoryPath[selectedCategoryPath.length - 1];
-        q = query(
-          collection(db, 'products'),
-          where('category', '==', lastCategory.name),
-        );
-      }
-      onSnapshot(q, snapshot => {
-        const productsData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setSearchResults(productsData);
-      });
+      categoryNames = getAllSubCategoryNames(selectedCategory.id);
     }
+
+    const unsubscribe = fetchProductsForCategories(categoryNames, products => {
+      setSearchResults(products);
+      setLoading(false);
+    });
+
+    return unsubscribe;
+  }, [selectedCategory, categories, mainCategories]);
+
+  const handleSearch = query => {
+    setSearchQuery(query);
+    let categoryNames;
+    if (!selectedCategory) {
+      const mainCategoryIds = mainCategories.map(cat => cat.id);
+      categoryNames = mainCategoryIds.flatMap(id => getAllSubCategoryNames(id));
+    } else {
+      categoryNames = getAllSubCategoryNames(selectedCategory.id);
+    }
+
+    const unsubscribe = fetchProductsForCategories(categoryNames, products => {
+      const filteredProducts = query.trim()
+        ? products.filter(product =>
+            product.name.toLowerCase().includes(query.toLowerCase()),
+          )
+        : products;
+      setSearchResults(filteredProducts);
+    });
+
+    return unsubscribe;
   };
 
   const getSubCategories = parentId => {
@@ -150,54 +192,29 @@ export default function SearchScreen() {
   };
 
   const handleCategorySelect = category => {
-    console.log('Selecting category:', category);
-    if (category.parentId === null) {
-      setSelectedCategoryPath([category]);
+    fadeAnim.setValue(0);
+    setSelectedCategory(category);
+    const existingIndex = categoryPath.findIndex(cat => cat.id === category.id);
+    if (existingIndex !== -1) {
+      setCategoryPath(categoryPath.slice(0, existingIndex + 1));
     } else {
-      const existingIndex = selectedCategoryPath.findIndex(
-        cat => cat.id === category.id,
-      );
-      if (existingIndex !== -1) {
-        setSelectedCategoryPath(
-          selectedCategoryPath.slice(0, existingIndex + 1),
-        );
-      } else {
-        const parentIndex = selectedCategoryPath.findIndex(
-          cat => cat.id === category.parentId,
-        );
-        if (parentIndex !== -1) {
-          setSelectedCategoryPath([
-            ...selectedCategoryPath.slice(0, parentIndex + 1),
-            category,
-          ]);
-        } else {
-          setSelectedCategoryPath([...selectedCategoryPath, category]);
-        }
-      }
+      setCategoryPath([...categoryPath, category]);
     }
     setSearchQuery('');
   };
 
   const clearSearch = () => {
     setSearchQuery('');
-
-    let q;
-    if (selectedCategoryPath.length === 0) {
-      q = collection(db, 'products');
+    let categoryNames;
+    if (!selectedCategory) {
+      const mainCategoryIds = mainCategories.map(cat => cat.id);
+      categoryNames = mainCategoryIds.flatMap(id => getAllSubCategoryNames(id));
     } else {
-      const lastCategory =
-        selectedCategoryPath[selectedCategoryPath.length - 1];
-      q = query(
-        collection(db, 'products'),
-        where('category', '==', lastCategory.name),
-      );
+      categoryNames = getAllSubCategoryNames(selectedCategory.id);
     }
-    onSnapshot(q, snapshot => {
-      const productsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setSearchResults(productsData);
+
+    fetchProductsForCategories(categoryNames, products => {
+      setSearchResults(products);
     });
   };
 
@@ -216,6 +233,9 @@ export default function SearchScreen() {
           <Text style={styles.emptyStateTitle}>No results found</Text>
           <Text style={styles.emptyStateText}>
             We couldn't find any products matching "{searchQuery}"
+            {selectedCategory
+              ? ` in "${selectedCategory.name}" or its subcategories`
+              : ' in any category'}
           </Text>
         </View>
       );
@@ -226,11 +246,10 @@ export default function SearchScreen() {
         <View style={styles.emptyStateContainer}>
           <Text style={styles.emptyStateTitle}>No products found</Text>
           <Text style={styles.emptyStateText}>
-            {selectedCategoryPath.length > 0
-              ? `No products available in the "${
-                  selectedCategoryPath[selectedCategoryPath.length - 1].name
-                }" category`
-              : 'No products available'}
+            No products available
+            {selectedCategory
+              ? ` in the "${selectedCategory.name}" category or its subcategories`
+              : ' in any category'}
           </Text>
         </View>
       );
@@ -245,52 +264,82 @@ export default function SearchScreen() {
     </View>
   );
 
-  const renderCategoryLevel = (categories, level) => {
-    if (categories.length === 0) return null;
+  const renderCategories = () => {
+    const categoriesToShow = selectedCategory
+      ? getSubCategories(selectedCategory.id)
+      : mainCategories;
+
+    if (categoriesToShow.length === 0 && selectedCategory) {
+      return null;
+    }
+
     return (
-      <View style={styles.categoriesContainer}>
+      <Animated.View style={[styles.categoriesContainer, {opacity: fadeAnim}]}>
+        <Text style={styles.categoryTitle}>
+          {selectedCategory ? `${selectedCategory.name}` : 'Categories'}
+        </Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.categoriesScrollContainer}>
-          {categories.map(category => (
+          {categoriesToShow.map(category => (
             <CategoryCard
               key={category.id}
               category={category.name}
-              isSelected={selectedCategoryPath.some(
-                cat => cat.id === category.id,
-              )}
+              isSelected={selectedCategory?.id === category.id}
               onPress={() => handleCategorySelect(category)}
             />
           ))}
         </ScrollView>
-      </View>
+      </Animated.View>
     );
-  };
-
-  const renderCategoryHierarchy = () => {
-    const levels = [];
-    levels.push(renderCategoryLevel(mainCategories, 0));
-    selectedCategoryPath.forEach((selectedCategory, index) => {
-      const subCategories = getSubCategories(selectedCategory.id);
-      levels.push(renderCategoryLevel(subCategories, index + 1));
-    });
-    return levels;
   };
 
   return (
     <View style={[styles.container, {paddingTop: insets.top}]}>
       <View style={styles.header}>
         <Text style={styles.title}>Discover Products</Text>
-        {selectedCategoryPath.length > 0 && (
-          <Text style={styles.breadcrumb}>
-            {selectedCategoryPath.map(cat => cat.name).join(' > ')}
-          </Text>
+        {categoryPath.length > 0 && (
+          <Animated.View
+            style={[styles.breadcrumbContainer, {opacity: fadeAnim}]}>
+            <TouchableOpacity
+              onPress={() => {
+                setSelectedCategory(null);
+                setCategoryPath([]);
+              }}>
+              <Text
+                style={[
+                  styles.breadcrumb,
+                  !selectedCategory && styles.breadcrumbActive,
+                ]}>
+                All
+              </Text>
+            </TouchableOpacity>
+            {categoryPath.map((cat, index) => (
+              <React.Fragment key={cat.id}>
+                <Text style={styles.breadcrumbSeparator}>{'>'}</Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    setSelectedCategory(cat);
+                    setCategoryPath(categoryPath.slice(0, index + 1));
+                  }}>
+                  <Text
+                    style={[
+                      styles.breadcrumb,
+                      selectedCategory?.id === cat.id &&
+                        styles.breadcrumbActive,
+                    ]}>
+                    {cat.name}
+                  </Text>
+                </TouchableOpacity>
+              </React.Fragment>
+            ))}
+          </Animated.View>
         )}
       </View>
 
       <View style={styles.searchContainer}>
-        <SearchIcon size={18} color={Colors.neutral[500]} />
+        <SearchIcon size={20} color={Colors.neutral[600]} />
         <TextInput
           style={styles.searchInput}
           placeholder="Search products..."
@@ -301,12 +350,12 @@ export default function SearchScreen() {
         />
         {searchQuery.length > 0 && (
           <TouchableOpacity onPress={clearSearch}>
-            <X size={18} color={Colors.neutral[500]} />
+            <X size={20} color={Colors.neutral[600]} />
           </TouchableOpacity>
         )}
       </View>
 
-      {renderCategoryHierarchy()}
+      {renderCategories()}
 
       {searchResults.length > 0 ? (
         <FlatList
@@ -333,27 +382,54 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.xxl,
-    paddingBottom: Spacing.md,
+    paddingBottom: Spacing.sm,
   },
   title: {
-    fontFamily: Typography.fonts.semiBold,
+    fontFamily: Typography.fonts.bold,
     fontSize: Typography.sizes.xxl,
     color: Colors.text.primary,
   },
+  breadcrumbContainer: {
+    flexDirection: 'row',
+    marginTop: Spacing.sm,
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.md,
+  },
   breadcrumb: {
+    fontFamily: Typography.fonts.medium,
+    fontSize: Typography.sizes.sm,
+    color: Colors.neutral[600],
+    backgroundColor: Colors.neutral[100],
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: Spacing.radius.sm,
+    marginRight: Spacing.xs,
+  },
+  breadcrumbActive: {
+    color: Colors.text.inverse,
+    backgroundColor: Colors.primary[600],
+  },
+  breadcrumbSeparator: {
     fontFamily: Typography.fonts.regular,
     fontSize: Typography.sizes.sm,
-    color: Colors.text.secondary,
-    marginTop: Spacing.xs,
+    color: Colors.neutral[400],
+    marginHorizontal: Spacing.xs,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.neutral[100],
-    borderRadius: Spacing.radius.md,
+    backgroundColor: Colors.neutral[50],
+    borderRadius: Spacing.radius.lg,
     marginHorizontal: Spacing.lg,
     paddingHorizontal: Spacing.md,
-    marginBottom: Spacing.md,
+    marginVertical: Spacing.md,
+    shadowColor: Colors.neutral[900],
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
   searchInput: {
     flex: 1,
@@ -364,10 +440,21 @@ const styles = StyleSheet.create({
     marginLeft: Spacing.sm,
   },
   categoriesContainer: {
+    marginHorizontal: Spacing.lg,
     marginBottom: Spacing.md,
+    padding: Spacing.sm,
+    backgroundColor: Colors.neutral[50],
+    borderRadius: Spacing.radius.lg,
   },
   categoriesScrollContainer: {
-    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+  },
+  categoryTitle: {
+    fontFamily: Typography.fonts.semiBold,
+    fontSize: Typography.sizes.lg,
+    color: Colors.text.primary,
+    marginBottom: Spacing.sm,
+    marginLeft: Spacing.md,
   },
   resultsContainer: {
     paddingHorizontal: Spacing.lg,

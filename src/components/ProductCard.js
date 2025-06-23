@@ -6,12 +6,19 @@ import {
   StyleSheet,
   TouchableOpacity,
   Platform,
+  Dimensions,
 } from 'react-native';
 import Colors from '../constants/Colors';
 import Spacing from '../constants/Spacing';
 import Typography from '../constants/Typography';
 import {useCart} from '../context/CartContext';
 import {useNavigation} from '@react-navigation/native';
+
+const {width} = Dimensions.get('window');
+const numColumns = 2;
+const cardMargin = Spacing.md;
+const cardWidth =
+  (width - Spacing.lg * 2 - cardMargin * (numColumns - 1)) / numColumns;
 
 const FALLBACK_IMAGE = 'https://via.placeholder.com/150';
 
@@ -43,7 +50,7 @@ const ProductCard = ({product}) => {
 
   return (
     <TouchableOpacity
-      style={styles.card}
+      style={[styles.card, {width: cardWidth}]}
       onPress={handlePress}
       activeOpacity={0.9}>
       <View style={styles.imageContainer}>
@@ -51,6 +58,7 @@ const ProductCard = ({product}) => {
           source={{uri: imageUri}}
           style={styles.image}
           defaultSource={{uri: FALLBACK_IMAGE}}
+          resizeMode="contain"
         />
       </View>
 
@@ -108,23 +116,9 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   image: {
-    width: '200',
+    width: '100%',
     height: '100%',
     resizeMode: 'contain',
-  },
-  newBadge: {
-    position: 'absolute',
-    top: Spacing.sm,
-    right: Spacing.sm,
-    backgroundColor: Colors.accent[500],
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: Spacing.radius.sm,
-  },
-  newBadgeText: {
-    color: Colors.text.inverse,
-    fontSize: Typography.sizes.xs,
-    fontFamily: Typography.fonts.medium,
   },
   contentContainer: {
     padding: Spacing.md,
