@@ -32,6 +32,7 @@ export default function CheckoutScreen() {
   const [processing, setProcessing] = useState(false);
   const [isExpressShipping, setIsExpressShipping] = useState(false);
   const [paymentIntentId, setPaymentIntentId] = useState(null);
+  const [paymentId, setPaymentId] = useState(null);
 
   const [shippingForm, setShippingForm] = useState({
     name: user
@@ -41,7 +42,7 @@ export default function CheckoutScreen() {
     city: '',
     state: '',
     zip: '',
-    country: 'United States',
+    country: '',
   });
 
   const insets = useSafeAreaInsets();
@@ -118,7 +119,7 @@ export default function CheckoutScreen() {
         },
         shippingMethod: isExpressShipping ? 'Express' : 'Standard',
         paymentMethod: 'Card',
-        paymentIntentId: paymentIntentId ?? '',
+        paymentIntentId: paymentId ?? '',
         createdAt: new Date(),
       };
 
@@ -161,8 +162,9 @@ export default function CheckoutScreen() {
           errorData.error || 'Failed to fetch payment sheet params',
         );
       }
-      const {paymentIntent, ephemeralKey, customer} = await response.json();
-      return {paymentIntent, ephemeralKey, customer};
+      const {paymentIntent, ephemeralKey, customer, paymentIntentId} =
+        await response.json();
+      return {paymentIntent, ephemeralKey, customer, paymentIntentId};
     } catch (error) {
       console.error('Error fetching payment sheet params:', error);
       throw error;
@@ -171,9 +173,10 @@ export default function CheckoutScreen() {
 
   const initializePaymentSheet = async () => {
     try {
-      const {paymentIntent, ephemeralKey, customer} =
+      const {paymentIntent, paymentIntentId, ephemeralKey, customer} =
         await fetchPaymentSheetParams();
-      setPaymentIntentId(paymentIntent); // Set paymentIntentId
+      setPaymentIntentId(paymentIntent);
+      setPaymentId(paymentIntentId);
       const {error} = await initPaymentSheet({
         merchantDisplayName: 'E-Commerce',
         customerId: customer,
@@ -196,11 +199,12 @@ export default function CheckoutScreen() {
   const openPaymentSheet = async () => {
     setProcessing(true);
     try {
-      const {paymentIntent} = await fetchPaymentSheetParams();
+      const {paymentIntent, paymentIntentId} = await fetchPaymentSheetParams();
       if (!paymentIntent) {
         throw new Error('Failed to fetch payment intent');
       }
       setPaymentIntentId(paymentIntent);
+      setPaymentId(paymentIntentId);
       const {error} = await presentPaymentSheet();
       if (error) {
         Alert.alert(`Error code: ${error.code}`, error.message);
@@ -322,9 +326,10 @@ export default function CheckoutScreen() {
 
             <InputField
               label="Country"
+              placeholder="Country"
               value={shippingForm.country}
               onChangeText={value => handleShippingChange('country', value)}
-              editable={false}
+              required
             />
 
             <View style={styles.shippingOptions}>

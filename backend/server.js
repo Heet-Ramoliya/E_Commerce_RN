@@ -11,37 +11,35 @@ app.use(morgan('dev'));
 
 app.post('/refund-payment', async (req, res) => {
   try {
-    const { paymentIntentId } = req.body;
+    const {paymentIntentId} = req.body;
 
     if (!paymentIntentId) {
-      return res.status(400).send({ error: 'Payment Intent ID is required' });
+      return res.status(400).send({error: 'Payment Intent ID is required'});
     }
 
     const refund = await stripe.refunds.create({
       payment_intent: paymentIntentId,
     });
 
-    res
-      .status(200)
-      .send({ success: true, message: 'Refund successful', refund });
+    res.status(200).send({success: true, message: 'Refund successful', refund});
   } catch (error) {
-    res.status(500).send({ error: error.message });
+    res.status(500).send({error: error.message});
   }
 });
 
 app.post('/payment-sheet', async (req, res) => {
   try {
-    const { amount, currency = 'usd' } = req.body;
+    const {amount, currency = 'usd'} = req.body;
 
     if (!amount || isNaN(amount) || amount <= 0) {
-      return res.status(400).json({ error: 'Invalid amount provided' });
+      return res.status(400).json({error: 'Invalid amount provided'});
     }
 
     const customer = await stripe.customers.create();
 
     const ephemeralKey = await stripe.ephemeralKeys.create(
-      { customer: customer.id },
-      { apiVersion: '2025-04-30.basil' }
+      {customer: customer.id},
+      {apiVersion: '2025-04-30.basil'},
     );
 
     const paymentIntent = await stripe.paymentIntents.create({
@@ -55,6 +53,7 @@ app.post('/payment-sheet', async (req, res) => {
 
     res.json({
       paymentIntent: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
       ephemeralKey: ephemeralKey.secret,
       customer: customer.id,
     });

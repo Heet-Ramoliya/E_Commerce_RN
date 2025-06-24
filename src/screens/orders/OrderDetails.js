@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import {
+  collection,
   doc,
   getDoc,
   onSnapshot,
@@ -22,14 +23,17 @@ import Spacing from '../../constants/Spacing';
 import Header from '../../components/Header';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
+import {handleDownloadReceipt} from '../../utilities/helper';
 
 const OrderDetails = ({route}) => {
   const {orderId} = route.params;
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [company, setCompany] = useState(null);
   const insets = useSafeAreaInsets();
-
   const navigation = useNavigation();
+
+  console.log('company data :: ', company);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(
@@ -60,6 +64,29 @@ const OrderDetails = ({route}) => {
 
     return () => unsubscribe();
   }, [orderId]);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      collection(db, 'company'),
+      snapshot => {
+        const companyData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setCompany(companyData);
+        setLoading(false);
+      },
+      error => {
+        console.log('Error fetching company details:', error);
+        setLoading(false);
+      },
+    );
+    return () => unsubscribe();
+  }, []);
+
+  const downloadReceipts = async () => {
+    await handleDownloadReceipt(order, company[0]);
+  };
 
   const handleCancelOrder = async () => {
     Alert.alert(
@@ -213,6 +240,12 @@ const OrderDetails = ({route}) => {
           </View>
         </View>
 
+        <TouchableOpacity
+          style={[styles.cancelButton, {backgroundColor: Colors.primary[600]}]}
+          onPress={downloadReceipts}>
+          <Text style={styles.cancelButtonText}>Download Receipt</Text>
+        </TouchableOpacity>
+
         {order.status !== 'Cancelled' && order.status !== 'Delivered' && (
           <TouchableOpacity
             style={styles.cancelButton}
@@ -323,7 +356,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     borderRadius: Spacing.radius.sm,
     alignSelf: 'center',
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.md,
   },
   cancelButtonText: {
     fontFamily: Typography.fonts.semiBold,
